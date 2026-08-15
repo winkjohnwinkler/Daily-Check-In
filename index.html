@@ -1,0 +1,1533 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#14130f;
+  --panel:#1d1b16;
+  --panel-alt:#252217;
+  --line:#3a362a;
+  --text:#f2ede1;
+  --text-dim:#a49d89;
+  --accent:#e8a33d;
+  --accent-dim:#6b4f22;
+  --complete:#7fb885;
+  --progress:#5b9bd5;
+  --hold:#d0785a;
+  --ready:#8b8579;
+}
+*{box-sizing:border-box;}
+.ci-root{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100%;
+  padding:28px 20px 60px;
+  border-radius:14px;
+}
+.ci-mono{font-family:'IBM Plex Mono',monospace;}
+.ci-display{font-family:'Space Grotesk',sans-serif;}
+.ci-wrap{max-width:640px;margin:0 auto;}
+
+/* Slate header */
+.ci-slate{
+  background:repeating-linear-gradient(-45deg, var(--panel-alt) 0 14px, #201d16 14px 28px);
+  border:1px solid var(--line);
+  border-radius:10px 10px 0 0;
+  padding:12px 16px;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);
+}
+.ci-slate span.hi{color:var(--accent);}
+
+/* Filmstrip nav */
+.ci-strip{display:flex;gap:4px;padding:14px 0 18px;overflow-x:auto;}
+.ci-frame{
+  flex:0 0 auto;width:26px;height:20px;border-radius:2px;
+  border:1px solid var(--line);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:var(--text-dim);background:var(--panel);
+}
+.ci-frame.done{border-color:var(--accent-dim);background:var(--accent-dim);color:var(--text);}
+.ci-frame.current{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+
+.ci-card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-top:none;
+  border-radius:0 0 10px 10px;
+  padding:22px;
+}
+.ci-artist-name{font-size:28px;font-weight:700;margin:0 0 2px;}
+.ci-sub{color:var(--text-dim);font-size:13px;margin-bottom:20px;}
+
+.ci-task-row{
+  background:var(--panel-alt);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:16px;
+  margin-bottom:14px;
+  position:relative;
+}
+.ci-task-row .ci-remove{
+  position:absolute;top:10px;right:10px;
+  background:none;border:none;color:var(--text-dim);
+  cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;
+  border-radius:4px;
+}
+.ci-task-row .ci-remove:hover{color:var(--hold);background:rgba(255,255,255,.05);}
+
+.ci-field{margin-bottom:12px;}
+.ci-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:6px;}
+.ci-select, .ci-input, .ci-textarea{
+  width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);
+  padding:9px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:14px;
+}
+.ci-textarea{resize:vertical;min-height:56px;}
+.ci-due-display{font-size:13px;color:var(--accent);font-family:'IBM Plex Mono',monospace;}
+
+.ci-pillrow{display:flex;flex-wrap:wrap;gap:6px;}
+.ci-pill{position:relative;}
+.ci-pill input{position:absolute;opacity:0;width:100%;height:100%;cursor:pointer;margin:0;top:0;left:0;}
+.ci-pill span{
+  display:inline-block;padding:7px 12px;border-radius:20px;border:1px solid var(--line);
+  font-size:12.5px;color:var(--text-dim);cursor:pointer;user-select:none;
+}
+.ci-pill input:checked + span{color:var(--bg);border-color:transparent;}
+.ci-pill.status-Complete input:checked + span{background:var(--complete);}
+.ci-pill.status-In-Progress input:checked + span{background:var(--progress);}
+.ci-pill.status-On-Hold input:checked + span{background:var(--hold);}
+.ci-pill.status-Ready-to-Begin input:checked + span{background:var(--ready);}
+.ci-pill.pace-On-Track input:checked + span{background:var(--complete);}
+.ci-pill.pace-At-Risk input:checked + span{background:var(--accent);}
+.ci-pill.pace-Behind input:checked + span{background:var(--hold);}
+.ci-pill.pace-N-A input:checked + span{background:var(--ready);}
+
+.ci-addtask{
+  background:none;border:1px dashed var(--line);color:var(--text-dim);
+  width:100%;padding:10px;border-radius:8px;cursor:pointer;font-size:13px;margin-bottom:18px;
+}
+.ci-addtask:hover{border-color:var(--accent);color:var(--accent);}
+
+.ci-navrow{display:flex;justify-content:space-between;gap:10px;margin-top:6px;align-items:center;}
+.ci-navrow-links{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;}
+.ci-btn{
+  font-family:'Inter',sans-serif;font-size:13.5px;font-weight:600;
+  padding:11px 18px;border-radius:8px;border:1px solid var(--line);
+  background:transparent;color:var(--text);cursor:pointer;
+}
+.ci-btn:disabled{opacity:.35;cursor:not-allowed;}
+.ci-btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1508;}
+.ci-btn.ghost{border-color:transparent;color:var(--text-dim);}
+.ci-btn.ghost:hover{color:var(--text);}
+
+/* Import view */
+.ci-hero{padding:6px 0 22px;}
+.ci-hero h1{font-size:26px;margin:0 0 6px;}
+.ci-hero p{color:var(--text-dim);font-size:14px;line-height:1.5;max-width:520px;}
+.ci-textarea-big{width:100%;min-height:180px;font-family:'IBM Plex Mono',monospace;font-size:13px;
+  background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:14px;}
+.ci-format-hint{font-size:12px;color:var(--text-dim);margin:8px 0 18px;line-height:1.6;}
+.ci-format-hint code{background:var(--panel-alt);padding:1px 5px;border-radius:4px;}
+.ci-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.ci-note{font-size:12.5px;color:var(--accent);margin-bottom:14px;}
+.ci-dropzone{
+  border:1.5px dashed var(--line);border-radius:10px;padding:34px 20px;text-align:center;
+  cursor:pointer;margin-bottom:10px;background:var(--panel);transition:border-color .15s,background .15s;
+}
+.ci-dropzone:hover, .ci-dropzone.drag{border-color:var(--accent);background:var(--panel-alt);}
+.ci-drop-icon{font-size:22px;color:var(--text-dim);margin-bottom:8px;}
+.ci-drop-text{font-size:14.5px;color:var(--text);}
+.ci-drop-link{color:var(--accent);text-decoration:underline;}
+.ci-drop-sub{font-size:12px;color:var(--text-dim);margin-top:6px;}
+
+/* Summary / history */
+.ci-sum-artist{border-bottom:1px solid var(--line);padding:14px 0;}
+.ci-sum-artist:last-child{border-bottom:none;}
+.ci-sum-name{font-weight:600;font-size:15px;margin-bottom:6px;}
+.ci-sum-task{font-size:13px;color:var(--text-dim);margin:3px 0;padding-left:10px;border-left:2px solid var(--line);}
+.ci-badge{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:10px;margin-left:6px;color:#1a1508;}
+.ci-histlist{list-style:none;padding:0;margin:0;}
+.ci-histlist li{padding:12px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+.ci-histlist li:hover{color:var(--accent);}
+.ci-empty{color:var(--text-dim);font-size:13px;padding:20px 0;}
+.ci-toplink{background:none;border:none;color:var(--text-dim);font-size:12.5px;cursor:pointer;text-decoration:underline;padding:0;}
+.ci-export-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.ci-export-feedback{font-size:12.5px;}
+.ci-blocker-bar{display:flex;justify-content:space-between;align-items:center;margin:-10px 0 12px;flex-wrap:wrap;gap:8px;}
+.ci-blocker-bar-left{display:flex;gap:16px;}
+.ci-blocker-bar .ci-toplink{color:var(--hold);}
+.ci-blocker-bar-left .ci-toplink{color:var(--text-dim);}
+.ci-show-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+@media (max-width:480px){.ci-show-grid{grid-template-columns:1fr;}}
+.ci-show-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:20px 16px;text-align:left;cursor:pointer;color:var(--text);
+  display:flex;flex-direction:column;gap:6px;transition:border-color .15s,background .15s;
+}
+.ci-show-card:hover{border-color:var(--accent);background:var(--panel-alt);}
+.ci-show-code{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:.02em;}
+.ci-show-meta{font-size:12px;color:var(--text-dim);}
+.ci-show-done{font-size:11px;color:var(--accent);}
+.ci-artist-list li{cursor:pointer;}
+.ci-artist-row-name{font-weight:600;font-size:14.5px;}
+.ci-artist-row-meta{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
+.ci-artist-row-done{color:var(--complete);}
+.ci-artist-row.current{background:var(--panel-alt);}
+.ci-artist-row-tag{font-size:10px;color:var(--accent);border:1px solid var(--accent-dim);border-radius:8px;padding:1px 6px;text-transform:uppercase;letter-spacing:.04em;}
+.ci-landing-grid{display:flex;flex-direction:column;gap:12px;margin-bottom:8px;}
+.ci-landing-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:20px 18px;text-align:left;cursor:pointer;color:var(--text);
+  display:flex;flex-direction:column;gap:4px;transition:border-color .15s,background .15s;
+}
+.ci-landing-card:hover{border-color:var(--accent);background:var(--panel-alt);}
+.ci-landing-title{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;}
+.ci-landing-sub{font-size:13px;color:var(--text-dim);}
+</style>
+
+<div class="ci-root">
+  <div class="ci-wrap" id="ci-app"></div>
+</div>
+
+<script>
+(function(){
+  const STATUS_OPTS = ['Ready to Begin','In Progress','On Hold','Complete'];
+  const PACE_OPTS = ['On Track','At Risk','Behind','N/A'];
+  const STATUS_COLOR = {'Ready to Begin':'var(--ready)','In Progress':'var(--progress)','On Hold':'var(--hold)','Complete':'var(--complete)'};
+  const PACE_COLOR = {'On Track':'var(--complete)','At Risk':'var(--accent)','Behind':'var(--hold)','N/A':'var(--ready)'};
+
+  const today = new Date();
+  const todayKey = today.toISOString().slice(0,10); // the real, actual "today" — used as picker defaults
+  function labelForDate(dateStr){
+    const parts = String(dateStr||'').split('-').map(n=>parseInt(n,10));
+    const dt = (parts.length===3 && !parts.some(isNaN)) ? new Date(parts[0], parts[1]-1, parts[2]) : new Date();
+    return dt.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric'});
+  }
+
+  let state = {
+    view:'landing',
+    role:null,            // 'production' | 'artist'
+    activeDate:todayKey,  // the date whose roster/check-in we're working with
+    prodDateMode:null,    // 'import' | 'checkin' — what the production date-picker screen is for
+    flashMessage:null,
+    importResult:null,
+    artistOrder:[],
+    artistTasks:{},      // artist -> [{task, due}]  (FILTERED to the selected show, or to one self-serve artist)
+    rawArtistOrder:[],
+    rawArtistTasks:{},   // artist -> [{task, due, show}]  (FULL import, all shows)
+    selectedShow:null,   // e.g. 'ELS', or 'ALL'
+    selectedSelfArtist:null,
+    checkin:{},          // artist -> {entries:[{taskChoice,otherText,due,status,pace,notes}]}
+    currentIndex:0,
+    reportDate:null,
+    reportShowFilter:'ALL',
+    artistPickerReturn:null
+  };
+
+  const app = document.getElementById('ci-app');
+
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function slug(s){ return String(s).replace(/[^a-zA-Z0-9]+/g,'-'); }
+
+  // ===================================================================
+  // BACKEND CONFIG — paste your deployed Google Apps Script "Web app URL"
+  // between the quotes below (it ends in /exec). Nothing will save until
+  // this is filled in.
+  // ===================================================================
+  const API_URL = "https://script.google.com/macros/s/AKfycbwdAD0BtGhyRDXcpZH_obYKoldlQ0tYKmT-_jIQ8WsUqrL8aWk-ShLAqnx3myfLK9nSmA/exec";
+
+  let lastStorageError = null;
+  const NO_API_MSG = "This tool isn't connected to its data backend yet — the Google Apps Script URL hasn't been set. See the comment near the top of the file.";
+
+  async function storageGet(key, shared){
+    if(!API_URL || API_URL.indexOf('PASTE_YOUR') === 0){ lastStorageError = NO_API_MSG; return null; }
+    try{
+      const res = await fetch(`${API_URL}?action=get&key=${encodeURIComponent(key)}`);
+      const data = await res.json();
+      return (data && data.value) ? data.value : null;
+    }catch(e){
+      lastStorageError = (e && e.message) ? e.message : String(e);
+      return null;
+    }
+  }
+  async function storageSet(key, value, shared){
+    lastStorageError = null;
+    if(!API_URL || API_URL.indexOf('PASTE_YOUR') === 0){ lastStorageError = NO_API_MSG; return; }
+    try{
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({action:'set', key, value})
+      });
+      const data = await res.json();
+      if(!data || !data.ok){ lastStorageError = 'Backend did not confirm the save.'; }
+    }catch(e){
+      lastStorageError = (e && e.message) ? e.message : String(e);
+      console.error('save failed', e);
+    }
+  }
+  async function storageList(prefix, shared){
+    if(!API_URL || API_URL.indexOf('PASTE_YOUR') === 0){ lastStorageError = NO_API_MSG; return []; }
+    try{
+      const res = await fetch(`${API_URL}?action=list&prefix=${encodeURIComponent(prefix)}`);
+      const data = await res.json();
+      return (data && data.keys) ? data.keys : [];
+    }catch(e){
+      lastStorageError = (e && e.message) ? e.message : String(e);
+      return [];
+    }
+  }
+
+  const DATES_KEY = 'entry-dates';
+
+  function slugKey(s){
+    return String(s).trim().replace(/[\s\/\\'"]+/g, '_').slice(0,150) || 'unknown';
+  }
+  function entryKey(dateKey, artist){ return `entry:${dateKey}:${slugKey(artist)}`; }
+  function rosterKey(dateKey){ return `roster:${dateKey}`; }
+
+  async function pushRosterToShared(dateKey){
+    await storageSet(rosterKey(dateKey), JSON.stringify({order: state.rawArtistOrder, tasks: state.rawArtistTasks}), true);
+  }
+  async function loadRosterFromShared(dateKey){
+    const raw = await storageGet(rosterKey(dateKey), true);
+    if(!raw) return null;
+    try{ return JSON.parse(raw); }catch(e){ return null; }
+  }
+
+  async function recordEntryDate(dateKey){
+    let dates = [];
+    try{ const raw = await storageGet(DATES_KEY, true); dates = raw ? JSON.parse(raw) : []; }catch(e){ dates = []; }
+    if(!dates.includes(dateKey)){
+      dates.push(dateKey);
+      dates.sort().reverse();
+      await storageSet(DATES_KEY, JSON.stringify(dates), true);
+    }
+  }
+  async function listAllEntryDates(){
+    try{ const raw = await storageGet(DATES_KEY, true); return raw ? JSON.parse(raw) : []; }catch(e){ return []; }
+  }
+
+  async function saveArtistEntry(dateKey, artist, entries){
+    const payload = {artist, date: dateKey, entries, submittedAt: new Date().toISOString()};
+    await storageSet(entryKey(dateKey, artist), JSON.stringify(payload), true);
+    await recordEntryDate(dateKey);
+  }
+  async function getArtistEntry(dateKey, artist){
+    const raw = await storageGet(entryKey(dateKey, artist), true);
+    if(!raw) return null;
+    try{ return JSON.parse(raw); }catch(e){ return null; }
+  }
+  async function listEntriesForDate(dateKey){
+    const keys = await storageList(`entry:${dateKey}:`, true);
+    const results = await Promise.all(keys.map(async k=>{
+      const raw = await storageGet(k, true);
+      if(!raw) return null;
+      try{ return JSON.parse(raw); }catch(e){ return null; }
+    }));
+    return results.filter(Boolean);
+  }
+
+  // Re-derives an editable form entry from a previously saved (resolved) entry,
+  // matching by task name rather than trusting stored dropdown indices — those
+  // indices are only valid relative to whichever task list was active at save time
+  // (e.g. an artist's full task list vs. a manager's show-filtered subset).
+  function reconstructEntryForForm(stored, artist){
+    const opts = taskOptionsFor(artist);
+    const name = taskNameFromStoredEntry(stored);
+    const matchIdx = opts.findIndex(o => o.task === name);
+    if(matchIdx >= 0){
+      return {taskChoice:String(matchIdx), otherText:'', due:'', status:stored.status||'', pace:stored.pace||'', notes:stored.notes||''};
+    }
+    const isReal = name && name !== '(no task selected)';
+    return {
+      taskChoice: isReal ? 'other' : '',
+      otherText: isReal ? name : '',
+      due: stored.dueDisplay || stored.due || '',
+      status: stored.status || '',
+      pace: stored.pace || '',
+      notes: stored.notes || ''
+    };
+  }
+
+
+  // Full CSV/TSV parser: respects quoted fields that span multiple physical lines
+  // (e.g. multi-line notes fields), unlike a naive split-by-newline approach.
+  function parseDelimited(text, delim){
+    const rows = [];
+    let row = [];
+    let cur = '';
+    let inQuotes = false;
+    for(let i=0;i<text.length;i++){
+      const ch = text[i];
+      if(inQuotes){
+        if(ch === '"'){
+          if(text[i+1] === '"'){ cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += ch;
+      } else {
+        if(ch === '"') inQuotes = true;
+        else if(ch === delim){ row.push(cur); cur=''; }
+        else if(ch === '\r'){ /* skip, \n handles the break */ }
+        else if(ch === '\n'){ row.push(cur); cur=''; rows.push(row); row=[]; }
+        else cur += ch;
+      }
+    }
+    if(cur.length || row.length){ row.push(cur); rows.push(row); }
+    return rows.map(r=>r.map(c=>c.trim())).filter(r=>r.some(c=>c.length));
+  }
+
+  function parseImport(text){
+    // strip BOM (common in Excel/Airtable CSV exports)
+    text = text.replace(/^\uFEFF+/, '');
+    if(!text.trim()) return {order:[], tasks:{}};
+    const firstLine = text.split(/\r\n|\n/, 1)[0];
+    const delim = firstLine.indexOf('\t') >= 0 ? '\t' : ',';
+    let rows = parseDelimited(text, delim);
+    if(!rows.length) return {order:[], tasks:{}};
+    let headerIdx = {artist:0, task:1, start:2, due:3};
+    let start = 0;
+    const first = rows[0].map(c=>c.toLowerCase().trim());
+    const looksLikeHeader = first.some(c=>c.includes('artist') || c.includes('name') || c.includes('item') || c.includes('task'));
+    if(looksLikeHeader){
+      const assigned = {};
+      // pass 1: exact/near-exact header matches (avoids "Necessary For (Production Task)" stealing the task column)
+      first.forEach((c,i)=>{
+        if(!assigned.artist && (c==='artist'||c==='assignee'||c==='name')) { headerIdx.artist=i; assigned.artist=true; }
+        if(!assigned.task && (c==='item'||c==='task'||c==='items')) { headerIdx.task=i; assigned.task=true; }
+        if(!assigned.start && (c==='start'||c==='start date'||c==='projected start')) { headerIdx.start=i; assigned.start=true; }
+        if(!assigned.due && (c==='due'||c==='due date'||c==='deadline'||c==='end'||c==='end date'||c==='projected end')) { headerIdx.due=i; assigned.due=true; }
+      });
+      // pass 2: loose substring fallback for any field still unmatched, skipping relational columns
+      first.forEach((c,i)=>{
+        const isRelational = c.includes('necessary') || c.includes('dependent');
+        if(!assigned.artist && (c.includes('artist')||c.includes('assignee'))) { headerIdx.artist=i; assigned.artist=true; }
+        if(!assigned.task && !isRelational && (c.includes('item')||c.includes('task'))) { headerIdx.task=i; assigned.task=true; }
+        if(!assigned.start && c.includes('start')) { headerIdx.start=i; assigned.start=true; }
+        if(!assigned.due && !isRelational && (c.includes('due')||c.includes('deadline')||c.includes('end'))) { headerIdx.due=i; assigned.due=true; }
+      });
+      start = 1;
+    }
+    const order = [];
+    const tasks = {};
+    for(let i=start;i<rows.length;i++){
+      const r = rows[i];
+      const artist = r[headerIdx.artist];
+      if(!artist) continue;
+      const task = r[headerIdx.task] || '(untitled task)';
+      const due = r[headerIdx.due] || '';
+      const show = task.slice(0,3).toUpperCase() || 'UNK';
+      if(!tasks[artist]){ tasks[artist]=[]; order.push(artist); }
+      tasks[artist].push({task, due, show});
+    }
+    return {order, tasks};
+  }
+
+  // Summarizes the shows found in the raw import: code, how many artists, how many tasks
+  function getShowSummary(){
+    const map = {};
+    state.rawArtistOrder.forEach(artist=>{
+      (state.rawArtistTasks[artist]||[]).forEach(t=>{
+        if(!map[t.show]) map[t.show] = {artists:new Set(), taskCount:0};
+        map[t.show].artists.add(artist);
+        map[t.show].taskCount++;
+      });
+    });
+    return Object.keys(map).sort().map(code=>({
+      code, artistCount: map[code].artists.size, taskCount: map[code].taskCount
+    }));
+  }
+
+  // Filters the raw (all-shows) import down to just one show code, or 'ALL' for everyone
+  function applyShowFilter(code){
+    state.selectedShow = code;
+    if(code === 'ALL'){
+      state.artistOrder = state.rawArtistOrder.slice();
+      state.artistTasks = {};
+      state.rawArtistOrder.forEach(a=>{
+        state.artistTasks[a] = state.rawArtistTasks[a].map(t=>({task:t.task, due:t.due}));
+      });
+    } else {
+      state.artistOrder = state.rawArtistOrder.filter(a => state.rawArtistTasks[a].some(t=>t.show===code));
+      state.artistTasks = {};
+      state.artistOrder.forEach(a=>{
+        state.artistTasks[a] = state.rawArtistTasks[a].filter(t=>t.show===code).map(t=>({task:t.task, due:t.due}));
+      });
+    }
+  }
+
+  async function goToCheckinForShow(code){
+    applyShowFilter(code);
+    state.currentIndex = 0;
+    state.checkin = {};
+    await Promise.all(state.artistOrder.map(async artist=>{
+      const existing = await getArtistEntry(state.activeDate, artist);
+      if(existing && existing.entries && existing.entries.length){
+        state.checkin[artist] = {entries: existing.entries.map(e => reconstructEntryForForm(e, artist))};
+      }
+    }));
+    if(!state.artistOrder.length){ state.artistOrder = ['(unnamed artist)']; }
+    state.artistOrder.forEach(a => ensureCheckin(a));
+    state.view = 'select-artist';
+    render();
+  }
+
+  function blankEntry(){
+    return {taskChoice:'', otherText:'', due:'', status:'', pace:'', notes:''};
+  }
+  function ensureCheckin(artist){
+    if(!state.checkin[artist] || !state.checkin[artist].entries.length){
+      state.checkin[artist] = {entries:[blankEntry()]};
+    }
+  }
+
+  function render(){
+    if(state.view==='landing') return renderLanding();
+    if(state.view==='prod-home') return renderProdHome();
+    if(state.view==='prod-date-picker') return renderProdDatePicker();
+    if(state.view==='artist-date-picker') return renderArtistDatePicker();
+    if(state.view==='import') return renderImport();
+    if(state.view==='import-result') return renderImportResult();
+    if(state.view==='select-show') return renderSelectShow();
+    if(state.view==='select-artist') return renderSelectArtist();
+    if(state.view==='checkin') return renderCheckin();
+    if(state.view==='summary') return renderSummary();
+    if(state.view==='self-name') return renderSelfName();
+    if(state.view==='self-checkin') return renderSelfCheckin();
+    if(state.view==='self-done') return renderSelfDone();
+    if(state.view==='report') return renderReport();
+    if(state.view==='blockers') return renderBlockers();
+  }
+
+  function countBlockers(){
+    let n=0;
+    Object.values(state.checkin).forEach(c=>{
+      (c.entries||[]).forEach(e=>{ if(e.status==='On Hold' || e.pace==='Behind') n++; });
+    });
+    return n;
+  }
+
+  // ---------- LANDING VIEW (role chooser) ----------
+  function renderLanding(){
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Daily Check-in</h1>
+        <p>Who's using this right now?</p>
+      </div>
+      <div class="ci-landing-grid">
+        <button class="ci-landing-card" id="btn-role-production">
+          <span class="ci-landing-title">Production Team</span>
+          <span class="ci-landing-sub">Submit a CSV for a date, run a check-in, or view a report</span>
+        </button>
+        <button class="ci-landing-card" id="btn-role-artist">
+          <span class="ci-landing-title">Artists, Animators &amp; Tech</span>
+          <span class="ci-landing-sub">Find your name and fill out your own status</span>
+        </button>
+      </div>
+    `;
+    document.getElementById('btn-role-production').onclick = () => {
+      state.role = 'production';
+      state.view = 'prod-home';
+      render();
+    };
+    document.getElementById('btn-role-artist').onclick = () => {
+      state.role = 'artist';
+      state.view = 'artist-date-picker';
+      render();
+    };
+  }
+
+  // ---------- PRODUCTION TEAM HOME ----------
+  function renderProdHome(){
+    const flash = state.flashMessage;
+    state.flashMessage = null;
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Production Team</h1>
+        <p>What do you want to do?</p>
+      </div>
+      ${flash ? `<div class="ci-note">${esc(flash)}</div>` : ''}
+      <div class="ci-landing-grid">
+        <button class="ci-landing-card" id="btn-prod-import">
+          <span class="ci-landing-title">Submit CSV for a date</span>
+          <span class="ci-landing-sub">Upload the Airtable export for a specific day</span>
+        </button>
+        <button class="ci-landing-card" id="btn-prod-checkin">
+          <span class="ci-landing-title">Run a check-in</span>
+          <span class="ci-landing-sub">Step through your team yourself for a date's roster</span>
+        </button>
+        <button class="ci-landing-card" id="btn-prod-report">
+          <span class="ci-landing-title">View report</span>
+          <span class="ci-landing-sub">See everything submitted so far, by anyone</span>
+        </button>
+      </div>
+      <div class="ci-navrow"><button class="ci-btn" id="btn-prod-back">&larr; Back</button><span></span></div>
+    `;
+    document.getElementById('btn-prod-import').onclick = () => { state.prodDateMode='import'; state.view='prod-date-picker'; render(); };
+    document.getElementById('btn-prod-checkin').onclick = () => { state.prodDateMode='checkin'; state.view='prod-date-picker'; render(); };
+    document.getElementById('btn-prod-report').onclick = () => { state.reportDate=null; state.reportShowFilter='ALL'; state.view='report'; render(); };
+    document.getElementById('btn-prod-back').onclick = () => { state.role=null; state.view='landing'; render(); };
+  }
+
+  // ---------- PRODUCTION DATE PICKER (shared by "Submit CSV" and "Run a check-in") ----------
+  function renderProdDatePicker(){
+    const mode = state.prodDateMode;
+    const title = mode === 'import' ? 'Which date is this CSV for?' : 'Which date do you want to check in for?';
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">${esc(title)}</h1>
+        <p>Defaults to today, but you can pick any date.</p>
+      </div>
+      <div class="ci-field">
+        <input class="ci-input" type="date" id="prod-date-input" value="${esc(state.activeDate || todayKey)}" style="max-width:220px;">
+      </div>
+      <div id="prod-date-message"></div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-prod-date-back">&larr; Back</button>
+        <button class="ci-btn primary" id="btn-prod-date-continue">Continue &rarr;</button>
+      </div>
+    `;
+    document.getElementById('btn-prod-date-back').onclick = () => { state.view='prod-home'; render(); };
+    document.getElementById('btn-prod-date-continue').onclick = async () => {
+      const input = document.getElementById('prod-date-input');
+      const chosen = input.value || todayKey;
+      state.activeDate = chosen;
+      if(mode === 'import'){
+        state.view = 'import';
+        render();
+        return;
+      }
+      // mode === 'checkin': need an existing roster for this date
+      const roster = await loadRosterFromShared(chosen);
+      if(!roster || !roster.order || !roster.order.length){
+        const msg = document.getElementById('prod-date-message');
+        msg.innerHTML = `
+          <div class="ci-note" style="color:var(--hold);">No CSV has been submitted for ${esc(labelForDate(chosen))} yet.</div>
+          <button class="ci-btn" id="btn-prod-date-submit-instead">Submit one now for this date</button>
+        `;
+        document.getElementById('btn-prod-date-submit-instead').onclick = () => {
+          state.prodDateMode = 'import';
+          state.view = 'import';
+          render();
+        };
+        return;
+      }
+      state.rawArtistOrder = roster.order;
+      state.rawArtistTasks = roster.tasks;
+      const shows = getShowSummary();
+      if(shows.length <= 1){
+        await goToCheckinForShow(shows.length ? shows[0].code : 'ALL');
+      } else {
+        state.view = 'select-show';
+        render();
+      }
+    };
+  }
+
+  // ---------- ARTIST DATE PICKER ----------
+  function renderArtistDatePicker(){
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Which date?</h1>
+        <p>Pick the date you're checking in for &mdash; defaults to today.</p>
+      </div>
+      <div class="ci-field">
+        <input class="ci-input" type="date" id="artist-date-input" value="${esc(state.activeDate || todayKey)}" style="max-width:220px;">
+      </div>
+      <div id="artist-date-message"></div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-artist-date-back">&larr; Back</button>
+        <button class="ci-btn primary" id="btn-artist-date-continue">Continue &rarr;</button>
+      </div>
+    `;
+    document.getElementById('btn-artist-date-back').onclick = () => { state.role=null; state.view='landing'; render(); };
+    document.getElementById('btn-artist-date-continue').onclick = async () => {
+      const input = document.getElementById('artist-date-input');
+      const chosen = input.value || todayKey;
+      const roster = await loadRosterFromShared(chosen);
+      if(!roster || !roster.order || !roster.order.length){
+        document.getElementById('artist-date-message').innerHTML =
+          `<div class="ci-note" style="color:var(--hold);">No tasks have been imported for ${esc(labelForDate(chosen))} yet. Check with your production team.</div>`;
+        return;
+      }
+      state.activeDate = chosen;
+      state.rawArtistOrder = roster.order;
+      state.rawArtistTasks = roster.tasks;
+      state.view = 'self-name';
+      render();
+    };
+  }
+
+  // ---------- IMPORT VIEW ----------
+  function renderImport(){
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Submit CSV</h1>
+        <p>Uploading tasks for ${esc(labelForDate(state.activeDate))}. Upload the Airtable export below.</p>
+      </div>
+      <div class="ci-dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".csv,.tsv,text/csv,text/plain" style="display:none;">
+        <div class="ci-drop-icon">&#8676;</div>
+        <div class="ci-drop-text" id="drop-label">Drop your CSV here, or <span class="ci-drop-link">browse</span></div>
+        <div class="ci-drop-sub">Exported from Airtable as CSV &mdash; columns: Artist, Task, Start Date, Due Date</div>
+      </div>
+      <div id="loaded-file-info"></div>
+      <div class="ci-format-hint">A header row is optional &mdash; if your first row contains a word like <code>artist</code> or <code>due</code>, columns are matched automatically. <button class="ci-toplink" id="btn-paste-toggle">Paste text instead</button></div>
+      <div id="paste-area" style="display:none;">
+        <div class="ci-field">
+          <textarea class="ci-textarea-big" id="import-text" placeholder="Jamie Lin, Rig walk-cycle, 8/10, 8/18"></textarea>
+        </div>
+      </div>
+      <div class="ci-actions">
+        <button class="ci-btn primary" id="btn-start" disabled>Save for ${esc(state.activeDate)} &rarr;</button>
+        <button class="ci-toplink" id="btn-import-back">&larr; Back</button>
+      </div>
+    `;
+
+    let loadedText = '';
+    const startBtn = document.getElementById('btn-start');
+    const fileInfo = document.getElementById('loaded-file-info');
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const pasteArea = document.getElementById('paste-area');
+    const ta = document.getElementById('import-text');
+
+    function setLoadedText(text, sourceLabel){
+      loadedText = text;
+      startBtn.disabled = !text.trim();
+      if(sourceLabel){
+        const {order} = parseImport(text);
+        fileInfo.innerHTML = `<div class="ci-note">Loaded ${sourceLabel} &mdash; found ${order.length} artist${order.length===1?'':'s'}.</div>`;
+      }
+    }
+
+    function handleFile(file){
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => setLoadedText(String(reader.result), `"${file.name}"`);
+      reader.onerror = () => { fileInfo.innerHTML = `<div class="ci-note" style="color:var(--hold);">Couldn't read that file &mdash; try again or paste the data instead.</div>`; };
+      reader.readAsText(file);
+    }
+
+    dropzone.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+    ['dragover','dragenter'].forEach(evt=>{
+      dropzone.addEventListener(evt, (e)=>{ e.preventDefault(); dropzone.classList.add('drag'); });
+    });
+    ['dragleave','drop'].forEach(evt=>{
+      dropzone.addEventListener(evt, (e)=>{ e.preventDefault(); dropzone.classList.remove('drag'); });
+    });
+    dropzone.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      handleFile(file);
+    });
+
+    document.getElementById('btn-paste-toggle').onclick = () => {
+      const showing = pasteArea.style.display !== 'none';
+      pasteArea.style.display = showing ? 'none' : 'block';
+      if(!showing) storageGet('roster:lastImport').then(v=>{ if(v && !ta.value) ta.value = v; });
+    };
+    ta.addEventListener('input', () => setLoadedText(ta.value, null));
+
+    document.getElementById('btn-import-back').onclick = () => { state.view='prod-date-picker'; render(); };
+    document.getElementById('btn-start').onclick = async () => {
+      startBtn.disabled = true;
+      startBtn.textContent = 'Saving…';
+      const text = loadedText.trim();
+      const {order, tasks} = parseImport(text);
+      if(text) await storageSet('roster:lastImport', text);
+      state.rawArtistOrder = order;
+      state.rawArtistTasks = tasks;
+      await pushRosterToShared(state.activeDate);
+
+      // Verify the save actually persisted rather than trusting it blindly —
+      // shared storage only works once this artifact is Published, and writes
+      // fail silently otherwise, which is the #1 cause of "no tasks imported" later.
+      const verify = await loadRosterFromShared(state.activeDate);
+      const verified = !!(verify && verify.order && verify.order.length === order.length);
+
+      state.importResult = {success: verified, count: order.length, date: state.activeDate, errorText: verified ? null : lastStorageError};
+      state.view = 'import-result';
+      render();
+    };
+  }
+
+  // ---------- IMPORT RESULT (confirms the save actually persisted) ----------
+  function renderImportResult(){
+    const r = state.importResult || {};
+    const dateLabel = labelForDate(r.date);
+    app.innerHTML = r.success ? `
+      <div class="ci-hero">
+        <h1 class="ci-display">Saved</h1>
+        <p>${r.count} artist${r.count===1?'':'s'} saved for ${esc(dateLabel)}, and confirmed readable back from storage.</p>
+      </div>
+      <div class="ci-navrow">
+        <button class="ci-btn primary" id="btn-import-done">Done &mdash; back to home</button>
+        <span></span>
+      </div>
+    ` : `
+      <div class="ci-hero">
+        <h1 class="ci-display">Save didn't stick</h1>
+        <p>The CSV parsed fine, but reading it back from storage failed.</p>
+      </div>
+      ${r.errorText ? `<div class="ci-note ci-mono" style="color:var(--hold);">${esc(r.errorText)}</div>` : ''}
+      <div class="ci-note">If that error mentions something like "internal server error," this is likely a temporary issue with Claude's storage service rather than something wrong here — try again in a minute. If it instead says nothing failed but this still shows, make sure this artifact has been Published (persistent storage only activates once it's published).</div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-import-retry">&larr; Try again</button>
+        <button class="ci-btn primary" id="btn-import-done">Back to home anyway</button>
+      </div>
+    `;
+    document.getElementById('btn-import-done').onclick = () => { state.view='prod-home'; render(); };
+    const retryBtn = document.getElementById('btn-import-retry');
+    if(retryBtn) retryBtn.onclick = () => { state.view='import'; render(); };
+  }
+
+  // ---------- SELECT SHOW VIEW ----------
+  async function renderSelectShow(){
+    const shows = getShowSummary();
+    const cards = await Promise.all(shows.map(async s=>{
+      const artists = state.rawArtistOrder.filter(a => state.rawArtistTasks[a].some(t=>t.show===s.code));
+      const submitted = await Promise.all(artists.map(a => getArtistEntry(state.activeDate, a)));
+      const already = submitted.some(Boolean);
+      return `
+        <button class="ci-show-card" data-show="${esc(s.code)}">
+          <span class="ci-show-code">${esc(s.code)}</span>
+          <span class="ci-show-meta">${s.artistCount} artist${s.artistCount===1?'':'s'} &middot; ${s.taskCount} task${s.taskCount===1?'':'s'}</span>
+          ${already ? '<span class="ci-show-done">Some check-ins already submitted today</span>' : ''}
+        </button>
+      `;
+    }));
+
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Which show?</h1>
+        <p>Pick a show to run that team's check-in. Only artists and tasks for this show will show up.</p>
+      </div>
+      <div class="ci-show-grid">${cards.join('')}</div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-back-to-import">&larr; Back</button>
+        <button class="ci-toplink" id="btn-all-shows">Run one combined check-in for everyone instead</button>
+      </div>
+    `;
+    document.querySelectorAll('.ci-show-card').forEach(btn=>{
+      btn.onclick = () => goToCheckinForShow(btn.dataset.show);
+    });
+    document.getElementById('btn-back-to-import').onclick = () => { state.view='prod-home'; render(); };
+    document.getElementById('btn-all-shows').onclick = () => goToCheckinForShow('ALL');
+  }
+
+  // ---------- SELECT ARTIST VIEW ----------
+  function renderSelectArtist(){
+    const showLabel = (state.selectedShow && state.selectedShow !== 'ALL') ? state.selectedShow : 'All Shows';
+    const cameFromCheckin = !!state.artistPickerReturn;
+    const rows = state.artistOrder.map((a,i)=>{
+      const count = taskOptionsFor(a).length;
+      const done = hasContent(a);
+      const isCurrent = cameFromCheckin && i === state.artistPickerReturn.index;
+      return `
+        <li class="ci-artist-row${isCurrent ? ' current' : ''}" data-idx="${i}">
+          <span class="ci-artist-row-name">${esc(a)}${isCurrent ? ' <span class="ci-artist-row-tag">current</span>' : ''}</span>
+          <span class="ci-artist-row-meta">
+            ${count} task${count===1?'':'s'}
+            ${done ? '<span class="ci-artist-row-done">&#10003; logged</span>' : ''}
+          </span>
+        </li>
+      `;
+    }).join('');
+
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">${esc(showLabel)}</h1>
+        <p>${cameFromCheckin ? 'Pick who to check in with next.' : "Choose who to check in with first. You can jump between artists freely once you're in."}</p>
+      </div>
+      <ul class="ci-histlist ci-artist-list">${rows}</ul>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-back-to-shows">&larr; ${cameFromCheckin ? 'Back to check-in' : 'Back to shows'}</button>
+        <span></span>
+      </div>
+    `;
+    document.querySelectorAll('.ci-artist-row').forEach(li=>{
+      li.onclick = () => {
+        state.currentIndex = parseInt(li.dataset.idx, 10);
+        state.artistPickerReturn = null;
+        state.view = 'checkin';
+        render();
+      };
+    });
+    document.getElementById('btn-back-to-shows').onclick = () => {
+      if(cameFromCheckin){
+        state.currentIndex = state.artistPickerReturn.index;
+        state.artistPickerReturn = null;
+        state.view = 'checkin';
+        render();
+        return;
+      }
+      const shows = getShowSummary();
+      state.view = shows.length > 1 ? 'select-show' : 'prod-home';
+      render();
+    };
+  }
+
+  // ---------- SELF-SERVE VIEWS (artist fills out their own check-in) ----------
+  async function renderSelfName(){
+    const rows = await Promise.all(state.rawArtistOrder.map(async (a,i)=>{
+      const existing = await getArtistEntry(state.activeDate, a);
+      const count = (state.rawArtistTasks[a]||[]).length;
+      return `
+        <li class="ci-artist-row" data-idx="${i}">
+          <span class="ci-artist-row-name">${esc(a)}</span>
+          <span class="ci-artist-row-meta">
+            ${count} task${count===1?'':'s'}
+            ${existing ? '<span class="ci-artist-row-done">&#10003; submitted today</span>' : ''}
+          </span>
+        </li>
+      `;
+    }));
+
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Find your name</h1>
+        <p>Pick yourself from the list below to fill out today's check-in.</p>
+      </div>
+      <ul class="ci-histlist ci-artist-list">${rows.join('')}</ul>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-self-back">&larr; Back</button>
+        <span></span>
+      </div>
+    `;
+    document.querySelectorAll('.ci-artist-row').forEach(li=>{
+      li.onclick = async () => {
+        const idx = parseInt(li.dataset.idx, 10);
+        const artist = state.rawArtistOrder[idx];
+        state.selectedSelfArtist = artist;
+        state.artistOrder = [artist];
+        state.artistTasks = {[artist]: (state.rawArtistTasks[artist]||[]).map(t=>({task:t.task, due:t.due}))};
+        const existing = await getArtistEntry(state.activeDate, artist);
+        state.checkin = {};
+        if(existing && existing.entries && existing.entries.length){
+          state.checkin[artist] = {entries: existing.entries.map(e => reconstructEntryForForm(e, artist))};
+        } else {
+          ensureCheckin(artist);
+        }
+        state.view = 'self-checkin';
+        render();
+      };
+    });
+    document.getElementById('btn-self-back').onclick = () => { state.view='artist-date-picker'; render(); };
+  }
+
+  function renderSelfCheckin(){
+    const artist = state.selectedSelfArtist;
+    ensureCheckin(artist);
+    const entries = state.checkin[artist].entries;
+
+    app.innerHTML = `
+      <div class="ci-slate">
+        <span>${esc(labelForDate(state.activeDate))}</span>
+        <span class="hi ci-mono">YOUR CHECK-IN</span>
+      </div>
+      <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">
+        <div class="ci-artist-name ci-display">${esc(artist)}</div>
+        <div class="ci-sub">${taskOptionsFor(artist).length} task${taskOptionsFor(artist).length===1?'':'s'} assigned in Airtable</div>
+        <div id="rows-container">
+          ${entries.map((e,i)=>taskRowHTML(artist,e,i,entries.length)).join('')}
+        </div>
+        <button class="ci-addtask" id="btn-add-row">+ Add another task</button>
+        <div class="ci-navrow">
+          <button class="ci-btn" id="btn-self-notme">&larr; Not me</button>
+          <button class="ci-btn primary" id="btn-self-submit">Submit check-in</button>
+        </div>
+        <div id="self-submit-error"></div>
+      </div>
+    `;
+
+    wireRowEvents(artist);
+    document.getElementById('btn-add-row').onclick = () => {
+      saveFormToState(artist);
+      state.checkin[artist].entries.push(blankEntry());
+      render();
+    };
+    document.getElementById('btn-self-notme').onclick = () => { state.view='self-name'; render(); };
+    document.getElementById('btn-self-submit').onclick = async () => {
+      const submitBtn = document.getElementById('btn-self-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+      saveFormToState(artist);
+      const resolvedEntries = state.checkin[artist].entries.map(e => ({
+        ...e,
+        taskName: describeEntry(artist, e),
+        dueDisplay: dueForEntry(artist, e)
+      }));
+      await saveArtistEntry(state.activeDate, artist, resolvedEntries);
+      const verify = await getArtistEntry(state.activeDate, artist);
+      if(!verify){
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit check-in';
+        document.getElementById('self-submit-error').innerHTML =
+          `<div class="ci-note" style="color:var(--hold);">That didn't save — please try again.</div>` +
+          (lastStorageError ? `<div class="ci-note ci-mono" style="color:var(--hold);">${esc(lastStorageError)}</div>` : '');
+        return;
+      }
+      state.view = 'self-done';
+      render();
+    };
+  }
+
+  function renderSelfDone(){
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Thanks!</h1>
+        <p>Your check-in for ${esc(labelForDate(state.activeDate))} has been saved.</p>
+      </div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-self-another">Submit for someone else</button>
+        <button class="ci-btn primary" id="btn-self-done">Done</button>
+      </div>
+    `;
+    document.getElementById('btn-self-another').onclick = () => { state.view='self-name'; render(); };
+    document.getElementById('btn-self-done').onclick = () => { state.view='landing'; render(); };
+  }
+
+  // ---------- CHECKIN VIEW ----------
+  function taskOptionsFor(artist){
+    return state.artistTasks[artist] || [];
+  }
+
+  function taskRowHTML(artist, entry, idx, total){
+    const opts = taskOptionsFor(artist);
+    const optionsHtml = opts.map((t,i)=>
+      `<option value="${i}" ${String(entry.taskChoice)===String(i)?'selected':''}>${esc(t.task)}</option>`
+    ).join('');
+    const isOther = entry.taskChoice === 'other';
+    let dueBlock = '';
+    if(entry.taskChoice !== '' && !isOther){
+      const t = opts[entry.taskChoice];
+      dueBlock = `<div class="ci-field"><span class="ci-label">Due date (from Airtable)</span><span class="ci-due-display">${esc(t && t.due ? t.due : '—')}</span></div>`;
+    } else if(isOther){
+      dueBlock = `<div class="ci-field"><label class="ci-label">Deadline (optional)</label><input class="ci-input" type="text" data-role="due" value="${esc(entry.due)}" placeholder="e.g. 8/22"></div>`;
+    }
+    return `
+      <div class="ci-task-row" data-idx="${idx}">
+        ${total>1 ? `<button class="ci-remove" data-action="remove-row" data-idx="${idx}" title="Remove task">&times;</button>` : ''}
+        <div class="ci-field">
+          <label class="ci-label">Current task</label>
+          <select class="ci-select" data-role="taskChoice">
+            <option value="">Select a task&hellip;</option>
+            ${optionsHtml}
+            <option value="other" ${isOther?'selected':''}>Other (not listed in Airtable)</option>
+          </select>
+        </div>
+        ${isOther ? `<div class="ci-field"><label class="ci-label">Describe the task</label><input class="ci-input" type="text" data-role="otherText" value="${esc(entry.otherText)}" placeholder="What are they working on?"></div>` : ''}
+        ${dueBlock}
+        <div class="ci-field">
+          <label class="ci-label">Status</label>
+          <div class="ci-pillrow" data-role="status-group">
+            ${STATUS_OPTS.map(s=>`
+              <label class="ci-pill status-${slug(s)}">
+                <input type="radio" name="status-${idx}" value="${s}" ${entry.status===s?'checked':''}>
+                <span>${esc(s)}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+        <div class="ci-field">
+          <label class="ci-label">On pace for deadline?</label>
+          <div class="ci-pillrow" data-role="pace-group">
+            ${PACE_OPTS.map(p=>`
+              <label class="ci-pill pace-${slug(p)}">
+                <input type="radio" name="pace-${idx}" value="${p}" ${entry.pace===p?'checked':''}>
+                <span>${esc(p)}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+        <div class="ci-field">
+          <label class="ci-label">Blockers / notes</label>
+          <textarea class="ci-textarea" data-role="notes" placeholder="Anything holding this up?">${esc(entry.notes)}</textarea>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCheckin(){
+    const total = state.artistOrder.length;
+    const idx = state.currentIndex;
+    const artist = state.artistOrder[idx];
+    ensureCheckin(artist);
+    const entries = state.checkin[artist].entries;
+
+    const strip = state.artistOrder.map((a,i)=>{
+      const cls = i===idx ? 'current' : (hasContent(a) ? 'done' : '');
+      return `<div class="ci-frame ${cls}" data-jump="${i}" title="${esc(a)}">${i+1}</div>`;
+    }).join('');
+
+    const blockerCount = countBlockers();
+    const showLabel = (state.selectedShow && state.selectedShow !== 'ALL') ? state.selectedShow : 'All Shows';
+    const canSwitchShow = getShowSummary().length > 1;
+
+    app.innerHTML = `
+      <div class="ci-slate">
+        <span>${esc(showLabel)} &mdash; ${esc(labelForDate(state.activeDate))}</span>
+        <span class="hi ci-mono">TAKE ${idx+1} / ${total}</span>
+      </div>
+      <div class="ci-strip">${strip}</div>
+      <div class="ci-blocker-bar">
+        <div class="ci-blocker-bar-left">
+          ${canSwitchShow ? `<button class="ci-toplink" id="btn-switch-show">Switch show</button>` : ''}
+          <button class="ci-toplink" id="btn-choose-artist">Choose artist</button>
+        </div>
+        <button class="ci-toplink" id="btn-view-blockers">View blockers${blockerCount ? ` (${blockerCount})` : ''}</button>
+      </div>
+      <div class="ci-card">
+        <div class="ci-artist-name ci-display">${esc(artist)}</div>
+        <div class="ci-sub">${taskOptionsFor(artist).length} task${taskOptionsFor(artist).length===1?'':'s'} assigned in Airtable</div>
+        <div id="rows-container">
+          ${entries.map((e,i)=>taskRowHTML(artist,e,i,entries.length)).join('')}
+        </div>
+        <button class="ci-addtask" id="btn-add-row">+ Add another task for ${esc(artist)}</button>
+        <div class="ci-navrow">
+          <button class="ci-btn" id="btn-prev" ${idx===0?'disabled':''}>&larr; Previous</button>
+          <div class="ci-navrow-links">
+            <button class="ci-toplink" id="btn-cancel">Save &amp; exit</button>
+            <button class="ci-toplink" id="btn-finish">Review &amp; Finish</button>
+          </div>
+          <button class="ci-btn primary" id="btn-next">${idx===total-1 ? 'Review & Finish' : 'Next \u2192'}</button>
+        </div>
+      </div>
+    `;
+
+    wireRowEvents(artist);
+
+    if(canSwitchShow){
+      document.getElementById('btn-switch-show').onclick = async () => {
+        saveFormToState(artist);
+        await persistCheckin();
+        state.view = 'select-show';
+        render();
+      };
+    }
+    document.getElementById('btn-choose-artist').onclick = () => {
+      saveFormToState(artist);
+      state.artistPickerReturn = {index: idx};
+      state.view = 'select-artist';
+      render();
+    };
+    document.getElementById('btn-view-blockers').onclick = () => {
+      saveFormToState(artist);
+      state.blockersReturn = {source:'checkin', index: idx};
+      state.view = 'blockers';
+      render();
+    };
+    document.querySelectorAll('[data-jump]').forEach(el=>{
+      el.onclick = () => { saveFormToState(artist); state.currentIndex = parseInt(el.dataset.jump,10); render(); };
+    });
+    document.getElementById('btn-add-row').onclick = () => {
+      saveFormToState(artist);
+      state.checkin[artist].entries.push(blankEntry());
+      render();
+    };
+    document.getElementById('btn-prev').onclick = () => {
+      saveFormToState(artist);
+      state.currentIndex = Math.max(0, idx-1);
+      render();
+    };
+    document.getElementById('btn-next').onclick = () => {
+      saveFormToState(artist);
+      if(idx === total-1){ state.view='summary'; render(); }
+      else { state.currentIndex = idx+1; render(); }
+    };
+    document.getElementById('btn-finish').onclick = () => {
+      saveFormToState(artist);
+      state.view = 'summary';
+      render();
+    };
+    document.getElementById('btn-cancel').onclick = async () => {
+      saveFormToState(artist);
+      await persistCheckin();
+      await exitToShowPickerOrImport();
+    };
+  }
+
+  function wireRowEvents(artist){
+    document.querySelectorAll('[data-action="remove-row"]').forEach(btn=>{
+      btn.onclick = () => {
+        saveFormToState(artist);
+        const i = parseInt(btn.dataset.idx,10);
+        state.checkin[artist].entries.splice(i,1);
+        render();
+      };
+    });
+    document.querySelectorAll('#rows-container select[data-role="taskChoice"]').forEach(sel=>{
+      sel.addEventListener('change', () => {
+        saveFormToState(artist);
+        render();
+      });
+    });
+  }
+
+  function hasContent(artist){
+    const c = state.checkin[artist];
+    if(!c) return false;
+    return c.entries.some(e => e.taskChoice !== '' || e.notes || e.status);
+  }
+
+  function saveFormToState(artist){
+    const rows = document.querySelectorAll('#rows-container .ci-task-row');
+    const entries = [];
+    rows.forEach(row=>{
+      const get = (role) => { const el = row.querySelector(`[data-role="${role}"]`); return el ? el.value : ''; };
+      const getChecked = (role) => { const el = row.querySelector(`[data-role="${role}"] input:checked`); return el ? el.value : ''; };
+      entries.push({
+        taskChoice: get('taskChoice'),
+        otherText: get('otherText'),
+        due: get('due'),
+        status: getChecked('status-group'),
+        pace: getChecked('pace-group'),
+        notes: get('notes')
+      });
+    });
+    if(entries.length) state.checkin[artist].entries = entries;
+  }
+
+  // ---------- SUMMARY VIEW ----------
+  function describeEntry(artist, e){
+    const opts = taskOptionsFor(artist);
+    let taskName = '(no task selected)';
+    if(e.taskChoice === 'other') taskName = e.otherText || '(unnamed task)';
+    else if(e.taskChoice !== '' && opts[e.taskChoice]) taskName = opts[e.taskChoice].task;
+    return taskName;
+  }
+
+  function dueForEntry(artist, e){
+    if(e.taskChoice !== '' && e.taskChoice !== 'other'){
+      const opts = taskOptionsFor(artist);
+      const t = opts[e.taskChoice];
+      return t ? t.due : '';
+    }
+    return e.due || '';
+  }
+
+  // Builds a fully self-contained payload: resolves task names/due dates now,
+  // so saved history and exports never depend on the live Airtable import state.
+  function buildPayload(){
+    const show = state.selectedShow;
+    const dateLabel = labelForDate(state.activeDate);
+    const label = (show && show !== 'ALL') ? `${show} Team — ${dateLabel}` : dateLabel;
+    return {
+      date: state.activeDate,
+      show: show,
+      label: label,
+      artists: state.artistOrder.map(artist=>{
+        const entries = (state.checkin[artist] ? state.checkin[artist].entries : []).map(e=>({
+          ...e,
+          taskName: describeEntry(artist, e),
+          dueDisplay: dueForEntry(artist, e)
+        }));
+        return {artist, entries};
+      })
+    };
+  }
+
+  function taskNameFromStoredEntry(e){
+    // backward-compatible: older saved entries may not have taskName resolved yet
+    if(e.taskName !== undefined) return e.taskName;
+    return e.taskChoice === 'other' ? (e.otherText || '(unnamed task)') : '(task)';
+  }
+
+  function buildSummaryText(payload){
+    const lines = [`Daily Check-in — ${payload.label}`, ''];
+    const attention = [];
+    payload.artists.forEach(a=>{
+      const entries = (a.entries||[]).filter(e => {
+        const name = taskNameFromStoredEntry(e);
+        return (name && name !== '(no task selected)') || e.notes || e.status;
+      });
+      if(!entries.length) return;
+      lines.push(`*${a.artist}*`);
+      entries.forEach(e=>{
+        const name = taskNameFromStoredEntry(e);
+        const due = e.dueDisplay ? ` (due ${e.dueDisplay})` : '';
+        const status = e.status || 'No status';
+        const pace = e.pace ? ` — ${e.pace}` : '';
+        lines.push(`• ${name}${due}: ${status}${pace}`);
+        if(e.notes) lines.push(`   ⚠ ${e.notes}`);
+        if(e.status === 'On Hold' || e.pace === 'Behind') attention.push(`${a.artist} — ${name}`);
+      });
+      lines.push('');
+    });
+    if(attention.length){
+      lines.push('*Needs attention:*');
+      attention.forEach(t=>lines.push(`• ${t}`));
+    }
+    return lines.join('\n').trim();
+  }
+
+  async function copyTextToClipboard(text){
+    try{
+      await navigator.clipboard.writeText(text);
+      return true;
+    }catch(e){
+      try{
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      }catch(e2){ return false; }
+    }
+  }
+
+  function downloadTextFile(text, filename){
+    const blob = new Blob([text], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function wireExportButtons(payload, dateKeyForFilename){
+    const copyBtn = document.getElementById('btn-copy-summary');
+    const dlBtn = document.getElementById('btn-download-summary');
+    const feedback = document.getElementById('export-feedback');
+    if(copyBtn){
+      copyBtn.onclick = async () => {
+        const ok = await copyTextToClipboard(buildSummaryText(payload));
+        feedback.textContent = ok ? 'Copied to clipboard.' : 'Copy failed — try downloading instead.';
+        feedback.style.color = ok ? 'var(--accent)' : 'var(--hold)';
+        setTimeout(()=>{ if(feedback) feedback.textContent=''; }, 3000);
+      };
+    }
+    if(dlBtn){
+      dlBtn.onclick = () => {
+        downloadTextFile(buildSummaryText(payload), `checkin_${dateKeyForFilename}.txt`);
+      };
+    }
+  }
+
+  function renderSummary(){
+    const payload = buildPayload();
+    const rows = payload.artists.map(({artist, entries})=>{
+      const taskLines = entries.map(e=>{
+        const status = e.status ? `<span class="ci-badge" style="background:${STATUS_COLOR[e.status]}">${esc(e.status)}</span>` : '';
+        const pace = e.pace ? `<span class="ci-badge" style="background:${PACE_COLOR[e.pace]}">${esc(e.pace)}</span>` : '';
+        return `<div class="ci-sum-task">${esc(e.taskName)} ${status}${pace}${e.notes?`<div style="margin-top:3px;color:var(--text-dim)">${esc(e.notes)}</div>`:''}</div>`;
+      }).join('');
+      return `<div class="ci-sum-artist"><div class="ci-sum-name">${esc(artist)}</div>${taskLines || '<div class="ci-empty">No tasks logged</div>'}</div>`;
+    }).join('');
+
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Review &amp; Save</h1>
+        <p>${esc(payload.label)} &mdash; check everything looks right, then save today's check-in.</p>
+      </div>
+      <div class="ci-export-row">
+        <button class="ci-btn ghost" id="btn-copy-summary">Copy summary</button>
+        <button class="ci-btn ghost" id="btn-download-summary">Download .txt</button>
+        <button class="ci-btn ghost" id="btn-view-blockers-summary">View blockers</button>
+        <span class="ci-export-feedback" id="export-feedback"></span>
+      </div>
+      <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">
+        ${rows}
+      </div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-back">&larr; Back to edit</button>
+        <button class="ci-btn primary" id="btn-save">Save Check-in</button>
+      </div>
+      <div id="save-error"></div>
+    `;
+    wireExportButtons(payload, `${state.selectedShow||'all'}_${state.activeDate}`);
+    document.getElementById('btn-view-blockers-summary').onclick = () => {
+      state.blockersReturn = {source:'summary'};
+      state.view = 'blockers';
+      render();
+    };
+    document.getElementById('btn-back').onclick = () => { state.currentIndex = state.artistOrder.length-1; state.view='checkin'; render(); };
+    document.getElementById('btn-save').onclick = async () => {
+      const saveBtn = document.getElementById('btn-save');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      const ok = await persistCheckin(payload);
+      if(!ok){
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Check-in';
+        document.getElementById('save-error').innerHTML =
+          `<div class="ci-note" style="color:var(--hold);">Save didn't stick — reading it back from storage failed.</div>` +
+          (lastStorageError ? `<div class="ci-note ci-mono" style="color:var(--hold);">${esc(lastStorageError)}</div>` : '') +
+          `<div class="ci-note">Try clicking Save again — this is often a temporary storage issue. If it keeps happening, make sure this artifact has been Published.</div>`;
+        return;
+      }
+      await exitToShowPickerOrImport();
+    };
+  }
+
+  async function exitToShowPickerOrImport(){
+    const shows = getShowSummary();
+    state.view = shows.length > 1 ? 'select-show' : 'prod-home';
+    render();
+  }
+
+  async function persistCheckin(precomputedPayload){
+    const payload = precomputedPayload || buildPayload();
+    await Promise.all(payload.artists.map(a => saveArtistEntry(payload.date, a.artist, a.entries)));
+    // Verify every artist's entry actually persisted rather than trusting the write blindly
+    const checks = await Promise.all(payload.artists.map(a => getArtistEntry(payload.date, a.artist)));
+    return checks.every(Boolean);
+  }
+
+  // ---------- REPORT VIEW ----------
+  async function renderReport(){
+    // Level 2: a specific date, aggregated across everyone who submitted
+    if(state.reportDate){
+      const records = await listEntriesForDate(state.reportDate);
+      const showsPresent = new Set();
+      records.forEach(rec => (rec.entries||[]).forEach(e=>{
+        const nm = taskNameFromStoredEntry(e);
+        if(nm && nm !== '(no task selected)') showsPresent.add(nm.slice(0,3).toUpperCase());
+      }));
+      const showOptions = ['ALL', ...Array.from(showsPresent).sort()];
+      const filter = state.reportShowFilter || 'ALL';
+
+      const matches = (rec) => filter==='ALL' || (rec.entries||[]).some(e => taskNameFromStoredEntry(e).slice(0,3).toUpperCase() === filter);
+      const filteredRecords = records.filter(matches).slice().sort((a,b)=>a.artist.localeCompare(b.artist));
+
+      const rows = filteredRecords.length ? filteredRecords.map(rec=>{
+        const relevant = filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter);
+        const lines = relevant.map(e=>{
+          const status = e.status ? `<span class="ci-badge" style="background:${STATUS_COLOR[e.status]}">${esc(e.status)}</span>` : '';
+          const pace = e.pace ? `<span class="ci-badge" style="background:${PACE_COLOR[e.pace]}">${esc(e.pace)}</span>` : '';
+          const taskName = taskNameFromStoredEntry(e);
+          return `<div class="ci-sum-task">${esc(taskName)} ${status}${pace}${e.notes?`<div style="margin-top:3px;color:var(--text-dim)">${esc(e.notes)}</div>`:''}</div>`;
+        }).join('');
+        return `<div class="ci-sum-artist"><div class="ci-sum-name">${esc(rec.artist)}</div>${lines || '<div class="ci-empty">No tasks logged</div>'}</div>`;
+      }).join('') : '<div class="ci-empty">No submissions match this filter.</div>';
+
+      const reportPayload = {
+        label: `Report — ${state.reportDate}`,
+        artists: filteredRecords.map(rec=>({
+          artist: rec.artist,
+          entries: filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter)
+        }))
+      };
+
+      app.innerHTML = `
+        <div class="ci-hero">
+          <h1 class="ci-display">${esc(state.reportDate)}</h1>
+          <p>${filteredRecords.length} of ${records.length} submission${records.length===1?'':'s'} shown.</p>
+        </div>
+        <div class="ci-export-row">
+          ${showOptions.length > 1 ? `<select class="ci-select" id="report-show-filter" style="max-width:150px;width:auto;">${showOptions.map(s=>`<option value="${esc(s)}" ${s===filter?'selected':''}>${s==='ALL'?'All shows':esc(s)}</option>`).join('')}</select>` : ''}
+          <button class="ci-btn ghost" id="btn-copy-summary">Copy summary</button>
+          <button class="ci-btn ghost" id="btn-download-summary">Download .txt</button>
+          <button class="ci-btn ghost" id="btn-view-blockers-report">View blockers</button>
+          <span class="ci-export-feedback" id="export-feedback"></span>
+        </div>
+        <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">${rows}</div>
+        <div class="ci-navrow"><button class="ci-btn" id="btn-back-report-dates">&larr; Back to dates</button><span></span></div>
+      `;
+      wireExportButtons(reportPayload, `report_${state.reportDate}_${filter}`);
+      const filterSel = document.getElementById('report-show-filter');
+      if(filterSel) filterSel.onchange = (e) => { state.reportShowFilter = e.target.value; render(); };
+      document.getElementById('btn-view-blockers-report').onclick = () => {
+        state.blockersReturn = {source:'report', reportDate: state.reportDate, reportShowFilter: filter};
+        state.view = 'blockers';
+        render();
+      };
+      document.getElementById('btn-back-report-dates').onclick = () => { state.reportDate = null; render(); };
+      return;
+    }
+
+    // Level 1: pick a date
+    const dates = await listAllEntryDates();
+    const items = dates.map(d=>`<li data-date="${esc(d)}"><span>${esc(d)}</span><span class="ci-mono" style="color:var(--text-dim)">view &rarr;</span></li>`).join('');
+    app.innerHTML = `
+      <div class="ci-hero"><h1 class="ci-display">Report</h1><p>Pick a date to see everything submitted so far, by anyone.</p></div>
+      ${dates.length ? `<ul class="ci-histlist">${items}</ul>` : '<div class="ci-empty">No check-ins submitted yet.</div>'}
+      <div class="ci-navrow"><button class="ci-btn" id="btn-back-report-home">&larr; Back</button><span></span></div>
+    `;
+    document.getElementById('btn-back-report-home').onclick = () => { state.view='prod-home'; render(); };
+    document.querySelectorAll('#ci-app li[data-date]').forEach(li=>{
+      li.onclick = () => { state.reportDate = li.dataset.date; render(); };
+    });
+  }
+
+  // ---------- BLOCKERS VIEW ----------
+  async function renderBlockers(){
+    const src = state.blockersReturn || {source:'checkin', index:0};
+    let payload;
+    if(src.source === 'report'){
+      const records = await listEntriesForDate(src.reportDate);
+      const filter = src.reportShowFilter || 'ALL';
+      const matches = (rec) => filter==='ALL' || (rec.entries||[]).some(e => taskNameFromStoredEntry(e).slice(0,3).toUpperCase() === filter);
+      const filtered = records.filter(matches);
+      payload = {
+        label: `Report — ${src.reportDate}`,
+        artists: filtered.map(rec=>({
+          artist: rec.artist,
+          entries: filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter)
+        }))
+      };
+    } else {
+      payload = buildPayload();
+    }
+
+    const blocked = [];
+    (payload.artists||[]).forEach(({artist, entries})=>{
+      (entries||[]).forEach(e=>{
+        if(e.status === 'On Hold' || e.pace === 'Behind'){
+          blocked.push({
+            artist,
+            name: taskNameFromStoredEntry(e),
+            due: e.dueDisplay || e.due || '',
+            status: e.status,
+            pace: e.pace,
+            notes: e.notes
+          });
+        }
+      });
+    });
+
+    const rows = blocked.length ? blocked.map(b => `
+      <div class="ci-sum-artist">
+        <div class="ci-sum-name">${esc(b.artist)}</div>
+        <div class="ci-sum-task">
+          ${esc(b.name)}${b.due ? ` <span class="ci-mono" style="color:var(--text-dim)">(due ${esc(b.due)})</span>` : ''}
+          ${b.status ? `<span class="ci-badge" style="background:${STATUS_COLOR[b.status]}">${esc(b.status)}</span>` : ''}
+          ${b.pace ? `<span class="ci-badge" style="background:${PACE_COLOR[b.pace]}">${esc(b.pace)}</span>` : ''}
+          ${b.notes ? `<div style="margin-top:3px;color:var(--text-dim)">${esc(b.notes)}</div>` : ''}
+        </div>
+      </div>
+    `).join('') : '<div class="ci-empty">No one is On Hold or marked Behind right now.</div>';
+
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Blockers</h1>
+        <p>${esc(payload.label || '')} &mdash; everyone currently On Hold or Behind pace, at a glance.</p>
+      </div>
+      <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">
+        ${rows}
+      </div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-blockers-back">&larr; Back</button>
+        <span></span>
+      </div>
+    `;
+
+    document.getElementById('btn-blockers-back').onclick = () => {
+      if(src.source === 'report'){ state.view = 'report'; state.reportDate = src.reportDate; state.reportShowFilter = src.reportShowFilter; }
+      else if(src.source === 'summary'){ state.view = 'summary'; }
+      else { state.view = 'checkin'; state.currentIndex = src.index; }
+      render();
+    };
+  }
+
+  // init
+  render();
+})();
+</script>
