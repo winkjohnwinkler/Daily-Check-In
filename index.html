@@ -1500,11 +1500,24 @@
     render();
   }
 
+  function hasMeaningfulContent(entries){
+    return (entries||[]).some(e => {
+      const name = e.taskName;
+      const hasTask = name && name !== '(no task selected)';
+      return hasTask || e.status || e.pace || e.notes;
+    });
+  }
+
   async function persistCheckin(precomputedPayload){
     const payload = precomputedPayload || buildPayload();
-    await Promise.all(payload.artists.map(a => saveArtistEntry(payload.date, a.artist, a.entries)));
-    // Verify every artist's entry actually persisted rather than trusting the write blindly
-    const checks = await Promise.all(payload.artists.map(a => getArtistEntry(payload.date, a.artist)));
+    // Only save artists who actually have something entered in THIS session.
+    // Without this, a bulk "Save Check-in" would write a blank placeholder for every
+    // artist in the show — including ones the manager skipped past — silently
+    // overwriting any real data those artists had already self-submitted earlier.
+    const toSave = payload.artists.filter(a => hasMeaningfulContent(a.entries));
+    await Promise.all(toSave.map(a => saveArtistEntry(payload.date, a.artist, a.entries)));
+    // Verify every saved artist's entry actually persisted rather than trusting the write blindly
+    const checks = await Promise.all(toSave.map(a => getArtistEntry(payload.date, a.artist)));
     return checks.every(Boolean);
   }
 
