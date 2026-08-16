@@ -1,19 +1,19 @@
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
 
 :root{
-  --bg:#14130f;
-  --panel:#1d1b16;
-  --panel-alt:#252217;
-  --line:#3a362a;
-  --text:#f2ede1;
-  --text-dim:#a49d89;
-  --accent:#e8a33d;
-  --accent-dim:#6b4f22;
-  --complete:#7fb885;
-  --progress:#5b9bd5;
-  --hold:#d0785a;
-  --ready:#8b8579;
+  --bg:#0c2426;
+  --panel:#123032;
+  --panel-alt:#173a3c;
+  --line:#2c4b4d;
+  --text:#f2f2ee;
+  --text-dim:#9db3b3;
+  --accent:#f2c230;
+  --accent-dim:#7a6420;
+  --complete:#6fbf8f;
+  --progress:#5aa9c2;
+  --hold:#d97a5a;
+  --ready:#8fa3a3;
 }
 *{box-sizing:border-box;}
 .ci-root{
@@ -25,12 +25,12 @@
   border-radius:14px;
 }
 .ci-mono{font-family:'IBM Plex Mono',monospace;}
-.ci-display{font-family:'Space Grotesk',sans-serif;}
+.ci-display{font-family:'Anton',sans-serif;font-weight:400;letter-spacing:.01em;text-transform:uppercase;}
 .ci-wrap{max-width:640px;margin:0 auto;}
 
 /* Slate header */
 .ci-slate{
-  background:repeating-linear-gradient(-45deg, var(--panel-alt) 0 14px, #201d16 14px 28px);
+  background:repeating-linear-gradient(-45deg, var(--panel-alt) 0 14px, #0e2a2c 14px 28px);
   border:1px solid var(--line);
   border-radius:10px 10px 0 0;
   padding:12px 16px;
@@ -57,7 +57,7 @@
   border-radius:0 0 10px 10px;
   padding:22px;
 }
-.ci-artist-name{font-size:28px;font-weight:700;margin:0 0 2px;}
+.ci-artist-name{font-size:32px;font-weight:400;margin:0 0 4px;color:var(--accent);}
 .ci-sub{color:var(--text-dim);font-size:13px;margin-bottom:20px;}
 
 .ci-task-row{
@@ -101,6 +101,8 @@
 .ci-pill.pace-At-Risk input:checked + span{background:var(--accent);}
 .ci-pill.pace-Behind input:checked + span{background:var(--hold);}
 .ci-pill.pace-N-A input:checked + span{background:var(--ready);}
+.ci-pill.blocker-Yes input:checked + span{background:var(--hold);}
+.ci-pill.blocker-No input:checked + span{background:var(--ready);}
 
 .ci-addtask{
   background:none;border:1px dashed var(--line);color:var(--text-dim);
@@ -116,14 +118,14 @@
   background:transparent;color:var(--text);cursor:pointer;
 }
 .ci-btn:disabled{opacity:.35;cursor:not-allowed;}
-.ci-btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1508;}
+.ci-btn.primary{background:var(--accent);border-color:var(--accent);color:#0c2426;}
 .ci-btn.ghost{border-color:transparent;color:var(--text-dim);}
 .ci-btn.ghost:hover{color:var(--text);}
 
 /* Import view */
-.ci-hero{padding:6px 0 22px;}
-.ci-hero h1{font-size:26px;margin:0 0 6px;}
-.ci-hero p{color:var(--text-dim);font-size:14px;line-height:1.5;max-width:520px;}
+.ci-hero{padding:6px 0 22px;border-bottom:1px solid var(--line);margin-bottom:20px;}
+.ci-hero h1{font-size:30px;margin:0 0 8px;line-height:1.05;}
+.ci-hero p{color:var(--text-dim);font-size:14px;line-height:1.5;max-width:520px;padding-bottom:14px;}
 .ci-textarea-big{width:100%;min-height:180px;font-family:'IBM Plex Mono',monospace;font-size:13px;
   background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:14px;}
 .ci-format-hint{font-size:12px;color:var(--text-dim);margin:8px 0 18px;line-height:1.6;}
@@ -148,7 +150,7 @@
 .ci-submission-block{margin-bottom:10px;}
 .ci-submission-block:not(:first-child){border-top:1px dashed var(--line);padding-top:10px;margin-top:8px;}
 .ci-submission-time{font-size:10.5px;color:var(--accent);font-family:'IBM Plex Mono',monospace;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
-.ci-badge{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:10px;margin-left:6px;color:#1a1508;}
+.ci-badge{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:10px;margin-left:6px;color:#0c2426;}
 .ci-histlist{list-style:none;padding:0;margin:0;}
 .ci-histlist li{padding:12px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
 .ci-histlist li:hover{color:var(--accent);}
@@ -168,7 +170,7 @@
   display:flex;flex-direction:column;gap:6px;transition:border-color .15s,background .15s;
 }
 .ci-show-card:hover{border-color:var(--accent);background:var(--panel-alt);}
-.ci-show-code{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:.02em;}
+.ci-show-code{font-family:'Anton',sans-serif;font-size:26px;font-weight:400;letter-spacing:.02em;color:var(--accent);}
 .ci-show-meta{font-size:12px;color:var(--text-dim);}
 .ci-show-done{font-size:11px;color:var(--accent);}
 .ci-artist-list li{cursor:pointer;}
@@ -207,18 +209,24 @@
   display:flex;flex-direction:column;gap:4px;transition:border-color .15s,background .15s;
 }
 .ci-landing-card:hover{border-color:var(--accent);background:var(--panel-alt);}
-.ci-landing-title{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;}
+.ci-landing-title{font-family:'Anton',sans-serif;font-size:20px;font-weight:400;letter-spacing:.02em;text-transform:uppercase;color:var(--accent);}
 .ci-landing-sub{font-size:13px;color:var(--text-dim);}
+.ci-footer{
+  max-width:640px;margin:32px auto 0;padding-top:14px;border-top:1px solid var(--line);
+  font-size:11px;letter-spacing:.08em;color:var(--text-dim);text-transform:uppercase;
+}
 </style>
 
 <div class="ci-root">
   <div class="ci-wrap" id="ci-app"></div>
+  <div class="ci-footer">BIG SHOT PICTURES</div>
 </div>
 
 <script>
 (function(){
   const STATUS_OPTS = ['Ready to Begin','In Progress','On Hold','Complete'];
   const PACE_OPTS = ['On Track','At Risk','Behind','N/A'];
+  const BLOCKER_OPTS = ['Yes','No'];
   const STATUS_COLOR = {'Ready to Begin':'var(--ready)','In Progress':'var(--progress)','On Hold':'var(--hold)','Complete':'var(--complete)'};
   const PACE_COLOR = {'On Track':'var(--complete)','At Risk':'var(--accent)','Behind':'var(--hold)','N/A':'var(--ready)'};
 
@@ -494,7 +502,7 @@
   }
 
   function blankEntry(){
-    return {taskChoice:'', otherText:'', due:'', status:'', pace:'', notes:''};
+    return {taskChoice:'', otherText:'', due:'', status:'', pace:'', hasBlocker:'', blockerText:'', notes:''};
   }
   function ensureCheckin(artist){
     if(!state.checkin[artist] || !state.checkin[artist].entries.length){
@@ -1162,8 +1170,19 @@
           </div>
         </div>
         <div class="ci-field">
-          <label class="ci-label">Blockers / notes</label>
-          <textarea class="ci-textarea" data-role="notes" placeholder="Anything holding this up?">${esc(entry.notes)}</textarea>
+          <label class="ci-label">Any blockers?</label>
+          <div class="ci-pillrow" data-role="blocker-group">
+            ${BLOCKER_OPTS.map(b=>`
+              <label class="ci-pill blocker-${slug(b)}">
+                <input type="radio" name="blocker-${idx}" value="${b}" ${entry.hasBlocker===b?'checked':''}>
+                <span>${esc(b)}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+        ${entry.hasBlocker==='Yes' ? `<div class="ci-field"><label class="ci-label">Describe the blocker</label><textarea class="ci-textarea" data-role="blockerText" placeholder="What's holding this up?">${esc(entry.blockerText)}</textarea></div>` : ''}
+        <div class="ci-field">
+          <label class="ci-label">Notes</label>
+          <textarea class="ci-textarea" data-role="notes" placeholder="Anything else worth mentioning?">${esc(entry.notes)}</textarea>
         </div>
       </div>
     `;
@@ -1283,26 +1302,39 @@
         render();
       });
     });
+    document.querySelectorAll('#rows-container [data-role="blocker-group"] input[type="radio"]').forEach(input=>{
+      input.addEventListener('change', () => {
+        saveFormToState(artist);
+        render();
+      });
+    });
   }
 
   function hasContent(artist){
     const c = state.checkin[artist];
     if(!c) return false;
-    return c.entries.some(e => e.taskChoice !== '' || e.notes || e.status);
+    return c.entries.some(e => e.taskChoice !== '' || e.notes || e.status || e.hasBlocker || e.blockerText);
   }
 
   function saveFormToState(artist){
     const rows = document.querySelectorAll('#rows-container .ci-task-row');
+    const prevEntries = (state.checkin[artist] && state.checkin[artist].entries) || [];
     const entries = [];
-    rows.forEach(row=>{
+    rows.forEach((row, i)=>{
       const get = (role) => { const el = row.querySelector(`[data-role="${role}"]`); return el ? el.value : ''; };
       const getChecked = (role) => { const el = row.querySelector(`[data-role="${role}"] input:checked`); return el ? el.value : ''; };
+      const blockerTextEl = row.querySelector('[data-role="blockerText"]');
+      // The blocker description field only renders when "Yes" is selected — preserve
+      // whatever was typed even while it's hidden, rather than wiping it on toggle.
+      const blockerText = blockerTextEl ? blockerTextEl.value : ((prevEntries[i] && prevEntries[i].blockerText) || '');
       entries.push({
         taskChoice: get('taskChoice'),
         otherText: get('otherText'),
         due: get('due'),
         status: getChecked('status-group'),
         pace: getChecked('pace-group'),
+        hasBlocker: getChecked('blocker-group'),
+        blockerText,
         notes: get('notes')
       });
     });
@@ -1354,13 +1386,17 @@
     return e.taskChoice === 'other' ? (e.otherText || '(unnamed task)') : '(task)';
   }
 
+  function isBlocked(e){
+    return e.hasBlocker === 'Yes' || e.status === 'On Hold' || e.pace === 'Behind';
+  }
+
   function buildSummaryText(payload){
     const lines = [`Daily Check-in — ${payload.label}`, ''];
     const attention = [];
     payload.artists.forEach(a=>{
       const entries = (a.entries||[]).filter(e => {
         const name = taskNameFromStoredEntry(e);
-        return (name && name !== '(no task selected)') || e.notes || e.status;
+        return (name && name !== '(no task selected)') || e.notes || e.status || e.blockerText;
       });
       if(!entries.length) return;
       lines.push(`*${a.artist}*`);
@@ -1370,8 +1406,9 @@
         const status = e.status || 'No status';
         const pace = e.pace ? ` — ${e.pace}` : '';
         lines.push(`• ${name}${due}: ${status}${pace}`);
-        if(e.notes) lines.push(`   ⚠ ${e.notes}`);
-        if(e.status === 'On Hold' || e.pace === 'Behind') attention.push(`${a.artist} — ${name}`);
+        if(e.hasBlocker === 'Yes' && e.blockerText) lines.push(`   ⚠ Blocked: ${e.blockerText}`);
+        if(e.notes) lines.push(`   Notes: ${e.notes}`);
+        if(isBlocked(e)) attention.push(`${a.artist} — ${name}`);
       });
       lines.push('');
     });
@@ -1437,7 +1474,7 @@
       const taskLines = entries.map(e=>{
         const status = e.status ? `<span class="ci-badge" style="background:${STATUS_COLOR[e.status]}">${esc(e.status)}</span>` : '';
         const pace = e.pace ? `<span class="ci-badge" style="background:${PACE_COLOR[e.pace]}">${esc(e.pace)}</span>` : '';
-        return `<div class="ci-sum-task">${esc(e.taskName)} ${status}${pace}${e.notes?`<div style="margin-top:3px;color:var(--text-dim)">${esc(e.notes)}</div>`:''}</div>`;
+        return `<div class="ci-sum-task">${esc(e.taskName)} ${status}${pace}${e.hasBlocker==='Yes'&&e.blockerText?`<div style="margin-top:3px;color:var(--hold);">&#9888; ${esc(e.blockerText)}</div>`:''}${e.notes?`<div style="margin-top:3px;color:var(--text-dim)">${esc(e.notes)}</div>`:''}</div>`;
       }).join('');
       return `<div class="ci-sum-artist"><div class="ci-sum-name">${esc(artist)}</div>${taskLines || '<div class="ci-empty">No tasks logged</div>'}</div>`;
     }).join('');
@@ -1497,7 +1534,7 @@
     return (entries||[]).some(e => {
       const name = e.taskName;
       const hasTask = name && name !== '(no task selected)';
-      return hasTask || e.status || e.pace || e.notes;
+      return hasTask || e.status || e.pace || e.notes || e.hasBlocker || e.blockerText;
     });
   }
 
@@ -1553,7 +1590,7 @@
             const status = e.status ? `<span class="ci-badge" style="background:${STATUS_COLOR[e.status]}">${esc(e.status)}</span>` : '';
             const pace = e.pace ? `<span class="ci-badge" style="background:${PACE_COLOR[e.pace]}">${esc(e.pace)}</span>` : '';
             const taskName = taskNameFromStoredEntry(e);
-            return `<div class="ci-sum-task">${esc(taskName)} ${status}${pace}${e.notes?`<div style="margin-top:3px;color:var(--text-dim)">${esc(e.notes)}</div>`:''}</div>`;
+            return `<div class="ci-sum-task">${esc(taskName)} ${status}${pace}${e.hasBlocker==='Yes'&&e.blockerText?`<div style="margin-top:3px;color:var(--hold);">&#9888; ${esc(e.blockerText)}</div>`:''}${e.notes?`<div style="margin-top:3px;color:var(--text-dim)">${esc(e.notes)}</div>`:''}</div>`;
           }).join('');
           return `<div class="ci-submission-block"><div class="ci-submission-time">${esc(formatTimeOfDay(rec.submittedAt))}</div>${lines}</div>`;
         }).join('');
@@ -1637,13 +1674,14 @@
     const blocked = [];
     (payload.artists||[]).forEach(({artist, entries})=>{
       (entries||[]).forEach(e=>{
-        if(e.status === 'On Hold' || e.pace === 'Behind'){
+        if(isBlocked(e)){
           blocked.push({
             artist,
             name: taskNameFromStoredEntry(e),
             due: e.dueDisplay || e.due || '',
             status: e.status,
             pace: e.pace,
+            blockerText: e.hasBlocker === 'Yes' ? e.blockerText : '',
             notes: e.notes
           });
         }
@@ -1657,10 +1695,11 @@
           ${esc(b.name)}${b.due ? ` <span class="ci-mono" style="color:var(--text-dim)">(due ${esc(b.due)})</span>` : ''}
           ${b.status ? `<span class="ci-badge" style="background:${STATUS_COLOR[b.status]}">${esc(b.status)}</span>` : ''}
           ${b.pace ? `<span class="ci-badge" style="background:${PACE_COLOR[b.pace]}">${esc(b.pace)}</span>` : ''}
+          ${b.blockerText ? `<div style="margin-top:3px;color:var(--hold);">&#9888; ${esc(b.blockerText)}</div>` : ''}
           ${b.notes ? `<div style="margin-top:3px;color:var(--text-dim)">${esc(b.notes)}</div>` : ''}
         </div>
       </div>
-    `).join('') : '<div class="ci-empty">No one is On Hold or marked Behind right now.</div>';
+    `).join('') : '<div class="ci-empty">No one has flagged a blocker or is On Hold / Behind right now.</div>';
 
     app.innerHTML = `
       <div class="ci-hero">
