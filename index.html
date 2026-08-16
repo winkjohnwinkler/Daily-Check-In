@@ -172,6 +172,29 @@
 .ci-artist-row-name{font-weight:600;font-size:14.5px;}
 .ci-artist-row-meta{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
 .ci-artist-row-done{color:var(--complete);}
+.ci-date-field{position:relative;display:inline-block;}
+.ci-date-display{
+  background:var(--bg);border:1px solid var(--line);color:var(--text);
+  padding:9px 14px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:14px;
+  cursor:pointer;min-width:200px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:12px;
+}
+.ci-date-display:hover{border-color:var(--accent);}
+.ci-cal-icon{opacity:.7;}
+.ci-cal-dropdown{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:20;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:14px;width:260px;box-shadow:0 8px 24px rgba(0,0,0,.4);
+}
+.ci-cal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-weight:600;font-size:13.5px;}
+.ci-cal-nav{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;padding:2px 8px;border-radius:4px;}
+.ci-cal-nav:hover{color:var(--accent);background:var(--panel-alt);}
+.ci-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.ci-cal-dow{font-size:10px;color:var(--text-dim);text-align:center;padding:4px 0;}
+.ci-cal-day{font-size:12.5px;text-align:center;padding:7px 0;border-radius:6px;cursor:pointer;color:var(--text);}
+.ci-cal-day:hover{background:var(--panel-alt);}
+.ci-cal-day.today{border:1px solid var(--accent-dim);}
+.ci-cal-day.selected{background:var(--accent);color:var(--bg);font-weight:600;}
+.ci-cal-day.empty{visibility:hidden;pointer-events:none;}
 .ci-artist-row.current{background:var(--panel-alt);}
 .ci-artist-row-tag{font-size:10px;color:var(--accent);border:1px solid var(--accent-dim);border-radius:8px;padding:1px 6px;text-transform:uppercase;letter-spacing:.04em;}
 .ci-landing-grid{display:flex;flex-direction:column;gap:12px;margin-bottom:8px;}
@@ -211,6 +234,9 @@
     prodDateMode:null,    // 'import' | 'checkin' — what the production date-picker screen is for
     flashMessage:null,
     importResult:null,
+    calPickerOpen:false,
+    calPickerYear:null,
+    calPickerMonth:null,
     artistOrder:[],
     artistTasks:{},      // artist -> [{task, due}]  (FILTERED to the selected show, or to one self-serve artist)
     rawArtistOrder:[],
@@ -500,6 +526,104 @@
     if(state.view==='blockers') return renderBlockers();
   }
 
+  // ---------- CUSTOM CALENDAR WIDGET (works identically in every browser) ----------
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function ymdStr(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; } // m is 0-indexed
+  function parseYmd(str){
+    const parts = String(str||'').split('-').map(n=>parseInt(n,10));
+    if(parts.length===3 && !parts.some(isNaN)) return {y:parts[0], m:parts[1]-1, d:parts[2]};
+    const t = new Date();
+    return {y:t.getFullYear(), m:t.getMonth(), d:t.getDate()};
+  }
+  function shortDateLabel(dateStr){
+    const p = parseYmd(dateStr);
+    const dt = new Date(p.y, p.m, p.d);
+    return dt.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+  }
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DOW_NAMES = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  function buildCalendarDropdownHTML(viewYear, viewMonth, selectedStr){
+    const firstOfMonth = new Date(viewYear, viewMonth, 1);
+    const startDow = firstOfMonth.getDay();
+    const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+    const todayP = parseYmd(todayKey);
+    const selP = parseYmd(selectedStr);
+
+    let cells = '';
+    for(let i=0;i<startDow;i++){ cells += `<div class="ci-cal-day empty"></div>`; }
+    for(let d=1; d<=daysInMonth; d++){
+      const isToday = (todayP.y===viewYear && todayP.m===viewMonth && todayP.d===d);
+      const isSelected = (selP.y===viewYear && selP.m===viewMonth && selP.d===d);
+      cells += `<div class="ci-cal-day${isToday?' today':''}${isSelected?' selected':''}" data-date="${ymdStr(viewYear,viewMonth,d)}">${d}</div>`;
+    }
+
+    return `
+      <div class="ci-cal-dropdown" id="cal-dropdown">
+        <div class="ci-cal-header">
+          <button type="button" class="ci-cal-nav" data-nav="-1">&larr;</button>
+          <span>${MONTH_NAMES[viewMonth]} ${viewYear}</span>
+          <button type="button" class="ci-cal-nav" data-nav="1">&rarr;</button>
+        </div>
+        <div class="ci-cal-grid">
+          ${DOW_NAMES.map(d=>`<div class="ci-cal-dow">${d}</div>`).join('')}
+          ${cells}
+        </div>
+      </div>
+    `;
+  }
+
+  // Renders a clickable date field + (optionally open) calendar dropdown.
+  // selectedStr: the currently chosen date (YYYY-MM-DD). onSelect(dateStr): called when a day is clicked.
+  function renderDateFieldHTML(selectedStr){
+    if(state.calPickerOpen && (state.calPickerYear==null || state.calPickerMonth==null)){
+      const p = parseYmd(selectedStr);
+      state.calPickerYear = p.y;
+      state.calPickerMonth = p.m;
+    }
+    return `
+      <div class="ci-date-field">
+        <button type="button" class="ci-date-display" id="cal-display">
+          <span>${esc(shortDateLabel(selectedStr))}</span>
+          <span class="ci-cal-icon">&#128197;</span>
+        </button>
+        ${state.calPickerOpen ? buildCalendarDropdownHTML(state.calPickerYear, state.calPickerMonth, selectedStr) : ''}
+      </div>
+    `;
+  }
+
+  function wireDateField(onSelect){
+    const display = document.getElementById('cal-display');
+    if(display){
+      display.onclick = () => {
+        state.calPickerOpen = !state.calPickerOpen;
+        if(!state.calPickerOpen){ state.calPickerYear = null; state.calPickerMonth = null; }
+        render();
+      };
+    }
+    const dropdown = document.getElementById('cal-dropdown');
+    if(dropdown){
+      dropdown.querySelectorAll('[data-nav]').forEach(btn=>{
+        btn.onclick = (ev) => {
+          ev.stopPropagation();
+          state.calPickerMonth += parseInt(btn.dataset.nav,10);
+          if(state.calPickerMonth < 0){ state.calPickerMonth = 11; state.calPickerYear--; }
+          if(state.calPickerMonth > 11){ state.calPickerMonth = 0; state.calPickerYear++; }
+          render();
+        };
+      });
+      dropdown.querySelectorAll('[data-date]').forEach(cell=>{
+        cell.onclick = (ev) => {
+          ev.stopPropagation();
+          state.calPickerOpen = false;
+          state.calPickerYear = null;
+          state.calPickerMonth = null;
+          onSelect(cell.dataset.date);
+        };
+      });
+    }
+  }
+
   function countBlockers(){
     let n=0;
     Object.values(state.checkin).forEach(c=>{
@@ -533,6 +657,7 @@
     };
     document.getElementById('btn-role-artist').onclick = () => {
       state.role = 'artist';
+      state.calPickerOpen = false;
       state.view = 'artist-date-picker';
       render();
     };
@@ -564,8 +689,8 @@
       </div>
       <div class="ci-navrow"><button class="ci-btn" id="btn-prod-back">&larr; Back</button><span></span></div>
     `;
-    document.getElementById('btn-prod-import').onclick = () => { state.prodDateMode='import'; state.view='prod-date-picker'; render(); };
-    document.getElementById('btn-prod-checkin').onclick = () => { state.prodDateMode='checkin'; state.view='prod-date-picker'; render(); };
+    document.getElementById('btn-prod-import').onclick = () => { state.prodDateMode='import'; state.calPickerOpen=false; state.view='prod-date-picker'; render(); };
+    document.getElementById('btn-prod-checkin').onclick = () => { state.prodDateMode='checkin'; state.calPickerOpen=false; state.view='prod-date-picker'; render(); };
     document.getElementById('btn-prod-report').onclick = () => { state.reportDate=null; state.reportShowFilter='ALL'; state.view='report'; render(); };
     document.getElementById('btn-prod-back').onclick = () => { state.role=null; state.view='landing'; render(); };
   }
@@ -574,13 +699,14 @@
   function renderProdDatePicker(){
     const mode = state.prodDateMode;
     const title = mode === 'import' ? 'Which date is this CSV for?' : 'Which date do you want to check in for?';
+    if(!state.activeDate) state.activeDate = todayKey;
     app.innerHTML = `
       <div class="ci-hero">
         <h1 class="ci-display">${esc(title)}</h1>
         <p>Defaults to today, but you can pick any date.</p>
       </div>
       <div class="ci-field">
-        <input class="ci-input" type="date" id="prod-date-input" value="${esc(state.activeDate || todayKey)}" style="max-width:220px;">
+        ${renderDateFieldHTML(state.activeDate)}
       </div>
       <div id="prod-date-message"></div>
       <div class="ci-navrow">
@@ -589,9 +715,9 @@
       </div>
     `;
     document.getElementById('btn-prod-date-back').onclick = () => { state.view='prod-home'; render(); };
+    wireDateField((dateStr) => { state.activeDate = dateStr; render(); });
     document.getElementById('btn-prod-date-continue').onclick = async () => {
-      const input = document.getElementById('prod-date-input');
-      const chosen = input.value || todayKey;
+      const chosen = state.activeDate || todayKey;
       state.activeDate = chosen;
       if(mode === 'import'){
         state.view = 'import';
@@ -627,13 +753,14 @@
 
   // ---------- ARTIST DATE PICKER ----------
   function renderArtistDatePicker(){
+    if(!state.activeDate) state.activeDate = todayKey;
     app.innerHTML = `
       <div class="ci-hero">
         <h1 class="ci-display">Which date?</h1>
         <p>Pick the date you're checking in for &mdash; defaults to today.</p>
       </div>
       <div class="ci-field">
-        <input class="ci-input" type="date" id="artist-date-input" value="${esc(state.activeDate || todayKey)}" style="max-width:220px;">
+        ${renderDateFieldHTML(state.activeDate)}
       </div>
       <div id="artist-date-message"></div>
       <div class="ci-navrow">
@@ -642,9 +769,9 @@
       </div>
     `;
     document.getElementById('btn-artist-date-back').onclick = () => { state.role=null; state.view='landing'; render(); };
+    wireDateField((dateStr) => { state.activeDate = dateStr; render(); });
     document.getElementById('btn-artist-date-continue').onclick = async () => {
-      const input = document.getElementById('artist-date-input');
-      const chosen = input.value || todayKey;
+      const chosen = state.activeDate || todayKey;
       const roster = await loadRosterFromShared(chosen);
       if(!roster || !roster.order || !roster.order.length){
         document.getElementById('artist-date-message').innerHTML =
