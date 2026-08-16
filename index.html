@@ -145,6 +145,9 @@
 .ci-sum-artist:last-child{border-bottom:none;}
 .ci-sum-name{font-weight:600;font-size:15px;margin-bottom:6px;}
 .ci-sum-task{font-size:13px;color:var(--text-dim);margin:3px 0;padding-left:10px;border-left:2px solid var(--line);}
+.ci-submission-block{margin-bottom:10px;}
+.ci-submission-block:not(:first-child){border-top:1px dashed var(--line);padding-top:10px;margin-top:8px;}
+.ci-submission-time{font-size:10.5px;color:var(--accent);font-family:'IBM Plex Mono',monospace;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
 .ci-badge{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:10px;margin-left:6px;color:#1a1508;}
 .ci-histlist{list-style:none;padding:0;margin:0;}
 .ci-histlist li{padding:12px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
@@ -310,7 +313,7 @@
   function slugKey(s){
     return String(s).trim().replace(/[\s\/\\'"]+/g, '_').slice(0,150) || 'unknown';
   }
-  function entryKey(dateKey, artist){ return `entry:${dateKey}:${slugKey(artist)}`; }
+  function entryKey(dateKey, artist, submissionId){ return `entry:${dateKey}:${slugKey(artist)}:${submissionId}`; }
   function rosterKey(dateKey){ return `roster:${dateKey}`; }
 
   async function pushRosterToShared(dateKey){
@@ -335,16 +338,35 @@
     try{ const raw = await storageGet(DATES_KEY, true); return raw ? JSON.parse(raw) : []; }catch(e){ return []; }
   }
 
+  // Every submission creates its OWN record — never overwrites a previous one.
+  // This keeps a full timestamped history per artist per day, rather than a
+  // single "current status" that later check-ins would silently replace.
   async function saveArtistEntry(dateKey, artist, entries){
-    const payload = {artist, date: dateKey, entries, submittedAt: new Date().toISOString()};
-    await storageSet(entryKey(dateKey, artist), JSON.stringify(payload), true);
+    const submissionId = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const payload = {artist, date: dateKey, entries, submittedAt: new Date().toISOString(), submissionId};
+    await storageSet(entryKey(dateKey, artist, submissionId), JSON.stringify(payload), true);
     await recordEntryDate(dateKey);
+    return payload;
   }
-  async function getArtistEntry(dateKey, artist){
-    const raw = await storageGet(entryKey(dateKey, artist), true);
-    if(!raw) return null;
-    try{ return JSON.parse(raw); }catch(e){ return null; }
+
+  // Fetches every submission for one artist on one date (not just the latest).
+  async function listArtistEntries(dateKey, artist){
+    const keys = await storageList(`entry:${dateKey}:${slugKey(artist)}:`, true);
+    const results = await Promise.all(keys.map(async k=>{
+      const raw = await storageGet(k, true);
+      if(!raw) return null;
+      try{ return JSON.parse(raw); }catch(e){ return null; }
+    }));
+    return results.filter(Boolean).sort((a,b)=> new Date(b.submittedAt) - new Date(a.submittedAt));
   }
+  // Just the most recent submission for one artist on one date (used for
+  // lightweight "already submitted today" checks — not for pre-filling forms).
+  async function getLatestArtistEntry(dateKey, artist){
+    const all = await listArtistEntries(dateKey, artist);
+    return all.length ? all[0] : null;
+  }
+  // Every individual submission for a date, across every artist — this is the
+  // full history for that day, used by the Report.
   async function listEntriesForDate(dateKey){
     const keys = await storageList(`entry:${dateKey}:`, true);
     const results = await Promise.all(keys.map(async k=>{
@@ -353,28 +375,6 @@
       try{ return JSON.parse(raw); }catch(e){ return null; }
     }));
     return results.filter(Boolean);
-  }
-
-  // Re-derives an editable form entry from a previously saved (resolved) entry,
-  // matching by task name rather than trusting stored dropdown indices — those
-  // indices are only valid relative to whichever task list was active at save time
-  // (e.g. an artist's full task list vs. a manager's show-filtered subset).
-  function reconstructEntryForForm(stored, artist){
-    const opts = taskOptionsFor(artist);
-    const name = taskNameFromStoredEntry(stored);
-    const matchIdx = opts.findIndex(o => o.task === name);
-    if(matchIdx >= 0){
-      return {taskChoice:String(matchIdx), otherText:'', due:'', status:stored.status||'', pace:stored.pace||'', notes:stored.notes||''};
-    }
-    const isReal = name && name !== '(no task selected)';
-    return {
-      taskChoice: isReal ? 'other' : '',
-      otherText: isReal ? name : '',
-      due: stored.dueDisplay || stored.due || '',
-      status: stored.status || '',
-      pace: stored.pace || '',
-      notes: stored.notes || ''
-    };
   }
 
 
@@ -487,12 +487,6 @@
     applyShowFilter(code);
     state.currentIndex = 0;
     state.checkin = {};
-    await Promise.all(state.artistOrder.map(async artist=>{
-      const existing = await getArtistEntry(state.activeDate, artist);
-      if(existing && existing.entries && existing.entries.length){
-        state.checkin[artist] = {entries: existing.entries.map(e => reconstructEntryForForm(e, artist))};
-      }
-    }));
     if(!state.artistOrder.length){ state.artistOrder = ['(unnamed artist)']; }
     state.artistOrder.forEach(a => ensureCheckin(a));
     state.view = 'select-artist';
@@ -539,6 +533,10 @@
     const p = parseYmd(dateStr);
     const dt = new Date(p.y, p.m, p.d);
     return dt.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+  }
+  function formatTimeOfDay(isoStr){
+    try{ return new Date(isoStr).toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'}); }
+    catch(e){ return ''; }
   }
   const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DOW_NAMES = ['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -916,7 +914,7 @@
     const shows = getShowSummary();
     const cards = await Promise.all(shows.map(async s=>{
       const artists = state.rawArtistOrder.filter(a => state.rawArtistTasks[a].some(t=>t.show===s.code));
-      const submitted = await Promise.all(artists.map(a => getArtistEntry(state.activeDate, a)));
+      const submitted = await Promise.all(artists.map(a => getLatestArtistEntry(state.activeDate, a)));
       const already = submitted.some(Boolean);
       return `
         <button class="ci-show-card" data-show="${esc(s.code)}">
@@ -1000,14 +998,14 @@
   // ---------- SELF-SERVE VIEWS (artist fills out their own check-in) ----------
   async function renderSelfName(){
     const rows = await Promise.all(state.rawArtistOrder.map(async (a,i)=>{
-      const existing = await getArtistEntry(state.activeDate, a);
+      const latest = await getLatestArtistEntry(state.activeDate, a);
       const count = (state.rawArtistTasks[a]||[]).length;
       return `
         <li class="ci-artist-row" data-idx="${i}">
           <span class="ci-artist-row-name">${esc(a)}</span>
           <span class="ci-artist-row-meta">
             ${count} task${count===1?'':'s'}
-            ${existing ? '<span class="ci-artist-row-done">&#10003; submitted today</span>' : ''}
+            ${latest ? `<span class="ci-artist-row-done">&#10003; last checked in ${esc(formatTimeOfDay(latest.submittedAt))}</span>` : ''}
           </span>
         </li>
       `;
@@ -1016,7 +1014,7 @@
     app.innerHTML = `
       <div class="ci-hero">
         <h1 class="ci-display">Find your name</h1>
-        <p>Pick yourself from the list below to fill out today's check-in.</p>
+        <p>Pick yourself from the list below to fill out today's check-in. Each check-in is logged separately, so feel free to check in again any time your status changes.</p>
       </div>
       <ul class="ci-histlist ci-artist-list">${rows.join('')}</ul>
       <div class="ci-navrow">
@@ -1025,19 +1023,14 @@
       </div>
     `;
     document.querySelectorAll('.ci-artist-row').forEach(li=>{
-      li.onclick = async () => {
+      li.onclick = () => {
         const idx = parseInt(li.dataset.idx, 10);
         const artist = state.rawArtistOrder[idx];
         state.selectedSelfArtist = artist;
         state.artistOrder = [artist];
         state.artistTasks = {[artist]: (state.rawArtistTasks[artist]||[]).map(t=>({task:t.task, due:t.due}))};
-        const existing = await getArtistEntry(state.activeDate, artist);
         state.checkin = {};
-        if(existing && existing.entries && existing.entries.length){
-          state.checkin[artist] = {entries: existing.entries.map(e => reconstructEntryForForm(e, artist))};
-        } else {
-          ensureCheckin(artist);
-        }
+        ensureCheckin(artist);
         state.view = 'self-checkin';
         render();
       };
@@ -1087,8 +1080,8 @@
         taskName: describeEntry(artist, e),
         dueDisplay: dueForEntry(artist, e)
       }));
-      await saveArtistEntry(state.activeDate, artist, resolvedEntries);
-      const verify = await getArtistEntry(state.activeDate, artist);
+      const saved = await saveArtistEntry(state.activeDate, artist, resolvedEntries);
+      const verify = await storageGet(saved.key, true);
       if(!verify){
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit check-in';
@@ -1515,15 +1508,26 @@
     // artist in the show — including ones the manager skipped past — silently
     // overwriting any real data those artists had already self-submitted earlier.
     const toSave = payload.artists.filter(a => hasMeaningfulContent(a.entries));
-    await Promise.all(toSave.map(a => saveArtistEntry(payload.date, a.artist, a.entries)));
-    // Verify every saved artist's entry actually persisted rather than trusting the write blindly
-    const checks = await Promise.all(toSave.map(a => getArtistEntry(payload.date, a.artist)));
+    const saved = await Promise.all(toSave.map(a => saveArtistEntry(payload.date, a.artist, a.entries)));
+    // Verify every save actually persisted rather than trusting the write blindly
+    const checks = await Promise.all(saved.map(s => storageGet(s.key, true)));
     return checks.every(Boolean);
   }
 
   // ---------- REPORT VIEW ----------
+  function groupRecordsByArtist(records){
+    const map = {};
+    records.forEach(r=>{ (map[r.artist] = map[r.artist]||[]).push(r); });
+    Object.values(map).forEach(list=>list.sort((a,b)=> new Date(b.submittedAt) - new Date(a.submittedAt)));
+    return map;
+  }
+  function latestPerArtist(records){
+    const map = groupRecordsByArtist(records);
+    return Object.keys(map).sort().map(artist=>map[artist][0]);
+  }
+
   async function renderReport(){
-    // Level 2: a specific date, aggregated across everyone who submitted
+    // Level 2: a specific date, showing every submission that day, grouped by artist
     if(state.reportDate){
       const records = await listEntriesForDate(state.reportDate);
       const showsPresent = new Set();
@@ -1534,32 +1538,43 @@
       const showOptions = ['ALL', ...Array.from(showsPresent).sort()];
       const filter = state.reportShowFilter || 'ALL';
 
-      const matches = (rec) => filter==='ALL' || (rec.entries||[]).some(e => taskNameFromStoredEntry(e).slice(0,3).toUpperCase() === filter);
-      const filteredRecords = records.filter(matches).slice().sort((a,b)=>a.artist.localeCompare(b.artist));
+      const grouped = groupRecordsByArtist(records);
+      const artistNames = Object.keys(grouped).sort();
 
-      const rows = filteredRecords.length ? filteredRecords.map(rec=>{
-        const relevant = filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter);
-        const lines = relevant.map(e=>{
-          const status = e.status ? `<span class="ci-badge" style="background:${STATUS_COLOR[e.status]}">${esc(e.status)}</span>` : '';
-          const pace = e.pace ? `<span class="ci-badge" style="background:${PACE_COLOR[e.pace]}">${esc(e.pace)}</span>` : '';
-          const taskName = taskNameFromStoredEntry(e);
-          return `<div class="ci-sum-task">${esc(taskName)} ${status}${pace}${e.notes?`<div style="margin-top:3px;color:var(--text-dim)">${esc(e.notes)}</div>`:''}</div>`;
+      let shownCount = 0;
+      const artistSections = artistNames.map(artist=>{
+        const filteredRecs = grouped[artist]
+          .map(rec=>({...rec, entries: filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter)}))
+          .filter(rec => rec.entries && rec.entries.length);
+        if(!filteredRecs.length) return '';
+        shownCount += filteredRecs.length;
+        const subBlocks = filteredRecs.map(rec=>{
+          const lines = rec.entries.map(e=>{
+            const status = e.status ? `<span class="ci-badge" style="background:${STATUS_COLOR[e.status]}">${esc(e.status)}</span>` : '';
+            const pace = e.pace ? `<span class="ci-badge" style="background:${PACE_COLOR[e.pace]}">${esc(e.pace)}</span>` : '';
+            const taskName = taskNameFromStoredEntry(e);
+            return `<div class="ci-sum-task">${esc(taskName)} ${status}${pace}${e.notes?`<div style="margin-top:3px;color:var(--text-dim)">${esc(e.notes)}</div>`:''}</div>`;
+          }).join('');
+          return `<div class="ci-submission-block"><div class="ci-submission-time">${esc(formatTimeOfDay(rec.submittedAt))}</div>${lines}</div>`;
         }).join('');
-        return `<div class="ci-sum-artist"><div class="ci-sum-name">${esc(rec.artist)}</div>${lines || '<div class="ci-empty">No tasks logged</div>'}</div>`;
-      }).join('') : '<div class="ci-empty">No submissions match this filter.</div>';
+        return `<div class="ci-sum-artist"><div class="ci-sum-name">${esc(artist)}</div>${subBlocks}</div>`;
+      }).join('');
 
+      const rows = artistSections || '<div class="ci-empty">No submissions match this filter.</div>';
+
+      // Exports use just the latest submission per artist — a clean "current status" snapshot
+      const latestRecords = latestPerArtist(records)
+        .map(rec=>({...rec, entries: filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter)}))
+        .filter(rec => rec.entries && rec.entries.length);
       const reportPayload = {
         label: `Report — ${state.reportDate}`,
-        artists: filteredRecords.map(rec=>({
-          artist: rec.artist,
-          entries: filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter)
-        }))
+        artists: latestRecords.map(rec=>({artist: rec.artist, entries: rec.entries}))
       };
 
       app.innerHTML = `
         <div class="ci-hero">
           <h1 class="ci-display">${esc(state.reportDate)}</h1>
-          <p>${filteredRecords.length} of ${records.length} submission${records.length===1?'':'s'} shown.</p>
+          <p>${shownCount} of ${records.length} check-in${records.length===1?'':'s'} shown, across ${artistNames.length} artist${artistNames.length===1?'':'s'}.</p>
         </div>
         <div class="ci-export-row">
           ${showOptions.length > 1 ? `<select class="ci-select" id="report-show-filter" style="max-width:150px;width:auto;">${showOptions.map(s=>`<option value="${esc(s)}" ${s===filter?'selected':''}>${s==='ALL'?'All shows':esc(s)}</option>`).join('')}</select>` : ''}
@@ -1568,6 +1583,7 @@
           <button class="ci-btn ghost" id="btn-view-blockers-report">View blockers</button>
           <span class="ci-export-feedback" id="export-feedback"></span>
         </div>
+        <div class="ci-note" style="margin-bottom:10px;">Exports use each artist's most recent check-in only. The list below shows every individual check-in.</div>
         <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">${rows}</div>
         <div class="ci-navrow"><button class="ci-btn" id="btn-back-report-dates">&larr; Back to dates</button><span></span></div>
       `;
@@ -1604,14 +1620,15 @@
     if(src.source === 'report'){
       const records = await listEntriesForDate(src.reportDate);
       const filter = src.reportShowFilter || 'ALL';
-      const matches = (rec) => filter==='ALL' || (rec.entries||[]).some(e => taskNameFromStoredEntry(e).slice(0,3).toUpperCase() === filter);
-      const filtered = records.filter(matches);
+      // Use only each artist's most recent check-in — an old resolved blocker from
+      // earlier in the day shouldn't still show as a current blocker.
+      const latest = latestPerArtist(records);
+      const filtered = latest
+        .map(rec=>({...rec, entries: filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter)}))
+        .filter(rec => rec.entries && rec.entries.length);
       payload = {
         label: `Report — ${src.reportDate}`,
-        artists: filtered.map(rec=>({
-          artist: rec.artist,
-          entries: filter==='ALL' ? rec.entries : rec.entries.filter(e=>taskNameFromStoredEntry(e).slice(0,3).toUpperCase()===filter)
-        }))
+        artists: filtered.map(rec=>({artist: rec.artist, entries: rec.entries}))
       };
     } else {
       payload = buildPayload();
