@@ -223,9 +223,13 @@
   max-width:640px;margin:32px auto 0;padding-top:14px;border-top:1px solid var(--line);
   font-size:11px;letter-spacing:.08em;color:var(--text-dim);text-transform:uppercase;
 }
+.ci-home-bar{max-width:640px;margin:0 auto 10px;}
+.ci-home-link{background:none;border:none;color:var(--text-dim);font-size:12.5px;cursor:pointer;padding:4px 0;}
+.ci-home-link:hover{color:var(--accent);}
 </style>
 
 <div class="ci-root">
+  <div class="ci-home-bar"><button class="ci-home-link" id="ci-home-btn">&larr; Home</button></div>
   <div class="ci-wrap" id="ci-app"></div>
   <div class="ci-footer">BIG SHOT PICTURES</div>
 </div>
@@ -347,8 +351,14 @@
   function entryKey(dateKey, artist, submissionId){ return `entry:${dateKey}:${slugKey(artist)}:${submissionId}`; }
   function rosterKey(dateKey){ return `roster:${dateKey}`; }
 
-  async function pushRosterToShared(dateKey){
-    await storageSet(rosterKey(dateKey), JSON.stringify({order: state.rawArtistOrder, tasks: state.rawArtistTasks}), true);
+  async function pushRosterToShared(dateKey, meta){
+    const payload = {
+      order: state.rawArtistOrder,
+      tasks: state.rawArtistTasks,
+      uploadedAt: new Date().toISOString(),
+      fileName: (meta && meta.fileName) || null
+    };
+    await storageSet(rosterKey(dateKey), JSON.stringify(payload), true);
   }
   async function loadRosterFromShared(dateKey){
     const raw = await storageGet(rosterKey(dateKey), true);
@@ -562,9 +572,9 @@
     if(state.view==='checkin') return renderCheckin();
     if(state.view==='summary') return renderSummary();
     if(state.view==='self-name') return renderSelfName();
+    if(state.view==='self-date') return renderSelfDate();
     if(state.view==='self-action') return renderSelfAction();
     if(state.view==='self-assignments') return renderSelfAssignments();
-    if(state.view==='self-checkin-date') return renderSelfCheckinDate();
     if(state.view==='self-checkin') return renderSelfCheckin();
     if(state.view==='self-done') return renderSelfDone();
     if(state.view==='report') return renderReport();
@@ -708,18 +718,32 @@
     document.getElementById('btn-role-artist').onclick = async () => {
       state.role = 'artist';
       state.calPickerOpen = false;
-      state.activeDate = todayKey;
-      const roster = await loadRosterFromShared(todayKey);
-      const msg = document.getElementById('landing-message');
-      if(!roster || !roster.order || !roster.order.length){
-        if(msg) msg.innerHTML = `<div class="ci-note" style="color:var(--hold);">No tasks have been imported for today (${esc(labelForDate(todayKey))}) yet. Check with your production team.</div>`;
+      const names = await buildMasterArtistList();
+      if(!names.length){
+        const msg = document.getElementById('landing-message');
+        if(msg) msg.innerHTML = `<div class="ci-note" style="color:var(--hold);">No CSVs have been uploaded yet. Check with your production team.</div>`;
         return;
       }
-      state.rawArtistOrder = roster.order;
-      state.rawArtistTasks = roster.tasks;
+      state.rawArtistOrder = names;
       state.view = 'self-name';
       render();
     };
+  }
+
+  // Every name that's ever appeared on any uploaded roster, across every date —
+  // so picking your name doesn't depend on today specifically having a CSV.
+  async function buildMasterArtistList(){
+    const dates = await listAllRosterDates();
+    const rosters = await Promise.all(dates.map(d => loadRosterFromShared(d)));
+    const nameSet = new Set();
+    rosters.forEach(r => { if(r && r.order) r.order.forEach(n => nameSet.add(n)); });
+    return Array.from(nameSet).sort();
+  }
+  // The single most recently uploaded roster, whatever date that happens to be —
+  // used as a fallback when someone picks a date that has no CSV of its own.
+  async function getMostRecentRosterDate(){
+    const dates = await listAllRosterDates(); // already sorted newest-first
+    return dates.length ? dates[0] : null;
   }
 
   // ---------- PRODUCTION TEAM HOME ----------
@@ -816,20 +840,29 @@
   }
 
   // ---------- MANAGE CSVs (view / replace / delete uploaded rosters per date) ----------
+  function formatFullDateTime(iso){
+    if(!iso) return '';
+    try{ return new Date(iso).toLocaleString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'}); }
+    catch(e){ return ''; }
+  }
+
   async function renderProdManageCsv(){
     const dates = await listAllRosterDates();
     const rows = await Promise.all(dates.map(async d=>{
       const roster = await loadRosterFromShared(d);
-      return {date: d, summary: summarizeRoster(roster)};
+      return {date: d, summary: summarizeRoster(roster), uploadedAt: roster && roster.uploadedAt, fileName: roster && roster.fileName};
     }));
 
     const itemsHtml = rows.length ? rows.map(r=>{
       const confirming = state.confirmDeleteDate === r.date;
+      const metaBits = [`${r.summary.artistCount} artist${r.summary.artistCount===1?'':'s'} &middot; ${r.summary.taskCount} task${r.summary.taskCount===1?'':'s'}`];
+      if(r.fileName) metaBits.push(esc(r.fileName));
+      if(r.uploadedAt) metaBits.push(`uploaded ${esc(formatFullDateTime(r.uploadedAt))}`);
       return `
         <div class="ci-csv-row">
           <div>
             <div class="ci-sum-name">${esc(labelForDate(r.date))}</div>
-            <div class="ci-artist-row-meta">${r.summary.artistCount} artist${r.summary.artistCount===1?'':'s'} &middot; ${r.summary.taskCount} task${r.summary.taskCount===1?'':'s'}</div>
+            <div class="ci-artist-row-meta">${metaBits.join(' &middot; ')}</div>
           </div>
           ${confirming ? `
             <div class="ci-csv-row-actions">
@@ -912,6 +945,7 @@
     `;
 
     let loadedText = '';
+    let loadedFileName = null;
     const startBtn = document.getElementById('btn-start');
     const fileInfo = document.getElementById('loaded-file-info');
     const dropzone = document.getElementById('dropzone');
@@ -919,8 +953,9 @@
     const pasteArea = document.getElementById('paste-area');
     const ta = document.getElementById('import-text');
 
-    function setLoadedText(text, sourceLabel){
+    function setLoadedText(text, sourceLabel, fileName){
       loadedText = text;
+      loadedFileName = fileName || null;
       startBtn.disabled = !text.trim();
       if(sourceLabel){
         const {order} = parseImport(text);
@@ -931,7 +966,7 @@
     function handleFile(file){
       if(!file) return;
       const reader = new FileReader();
-      reader.onload = () => setLoadedText(String(reader.result), `"${file.name}"`);
+      reader.onload = () => setLoadedText(String(reader.result), `"${file.name}"`, file.name);
       reader.onerror = () => { fileInfo.innerHTML = `<div class="ci-note" style="color:var(--hold);">Couldn't read that file &mdash; try again or paste the data instead.</div>`; };
       reader.readAsText(file);
     }
@@ -953,9 +988,9 @@
     document.getElementById('btn-paste-toggle').onclick = () => {
       const showing = pasteArea.style.display !== 'none';
       pasteArea.style.display = showing ? 'none' : 'block';
-      if(!showing) storageGet('roster:lastImport').then(v=>{ if(v && !ta.value) ta.value = v; });
+      if(!showing) storageGet('cache:lastImportText').then(v=>{ if(v && !ta.value) ta.value = v; });
     };
-    ta.addEventListener('input', () => setLoadedText(ta.value, null));
+    ta.addEventListener('input', () => setLoadedText(ta.value, null, null));
 
     document.getElementById('btn-import-back').onclick = () => { state.view='prod-date-picker'; render(); };
     document.getElementById('btn-start').onclick = async () => {
@@ -963,10 +998,10 @@
       startBtn.textContent = 'Saving…';
       const text = loadedText.trim();
       const {order, tasks} = parseImport(text);
-      if(text) await storageSet('roster:lastImport', text);
+      if(text) await storageSet('cache:lastImportText', text);
       state.rawArtistOrder = order;
       state.rawArtistTasks = tasks;
-      await pushRosterToShared(state.activeDate);
+      await pushRosterToShared(state.activeDate, {fileName: loadedFileName});
 
       // Verify the save actually persisted rather than trusting it blindly —
       // shared storage only works once this artifact is Published, and writes
@@ -1098,19 +1133,11 @@
 
   // ---------- SELF-SERVE VIEWS (artist fills out their own check-in) ----------
   async function renderSelfName(){
-    const rows = await Promise.all(state.rawArtistOrder.map(async (a,i)=>{
-      const latest = await getLatestArtistEntry(state.activeDate, a);
-      const count = (state.rawArtistTasks[a]||[]).length;
-      return `
-        <li class="ci-artist-row" data-idx="${i}">
-          <span class="ci-artist-row-name">${esc(a)}</span>
-          <span class="ci-artist-row-meta">
-            ${count} task${count===1?'':'s'}
-            ${latest ? `<span class="ci-artist-row-done">&#10003; last checked in ${esc(formatTimeOfDay(latest.submittedAt))}</span>` : ''}
-          </span>
-        </li>
-      `;
-    }));
+    const rows = state.rawArtistOrder.map((a,i)=>`
+      <li class="ci-artist-row" data-idx="${i}">
+        <span class="ci-artist-row-name">${esc(a)}</span>
+      </li>
+    `);
 
     app.innerHTML = `
       <div class="ci-hero">
@@ -1128,13 +1155,64 @@
         const idx = parseInt(li.dataset.idx, 10);
         const artist = state.rawArtistOrder[idx];
         state.selectedSelfArtist = artist;
-        state.artistOrder = [artist];
-        state.artistTasks = {[artist]: (state.rawArtistTasks[artist]||[]).map(t=>({task:t.task, due:t.due, start:t.start}))};
-        state.view = 'self-action';
+        state.calPickerOpen = false;
+        state.view = 'self-date';
         render();
       };
     });
     document.getElementById('btn-self-back').onclick = () => { state.view='landing'; render(); };
+  }
+
+  // ---------- SELF: PICK A DATE (right after name, before check in / review) ----------
+  function renderSelfDate(){
+    const artist = state.selectedSelfArtist;
+    if(!state.activeDate) state.activeDate = todayKey;
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">${esc(artist)}</h1>
+        <p>Which date? Defaults to today, but pick any date that's had a CSV uploaded.</p>
+      </div>
+      <div class="ci-field">
+        ${renderDateFieldHTML(state.activeDate)}
+      </div>
+      <div id="self-date-message"></div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-self-date-back">&larr; Not me</button>
+        <button class="ci-btn primary" id="btn-self-date-continue">Continue &rarr;</button>
+      </div>
+    `;
+    document.getElementById('btn-self-date-back').onclick = () => { state.view='self-name'; render(); };
+    wireDateField((dateStr) => { state.activeDate = dateStr; render(); });
+    document.getElementById('btn-self-date-continue').onclick = async () => {
+      const chosen = state.activeDate || todayKey;
+      const roster = await loadRosterFromShared(chosen);
+      if(!roster || !roster.order || !roster.order.length){
+        const msg = document.getElementById('self-date-message');
+        const mostRecentDate = await getMostRecentRosterDate();
+        if(mostRecentDate){
+          msg.innerHTML = `
+            <div class="ci-note" style="color:var(--hold);">No CSV has been uploaded for ${esc(labelForDate(chosen))} yet.</div>
+            <button class="ci-btn" id="btn-use-most-recent">Use the most recent CSV instead (${esc(labelForDate(mostRecentDate))})</button>
+          `;
+          document.getElementById('btn-use-most-recent').onclick = async () => {
+            const recentRoster = await loadRosterFromShared(mostRecentDate);
+            state.activeDate = mostRecentDate;
+            state.artistOrder = [artist];
+            state.artistTasks = {[artist]: (recentRoster.tasks[artist]||[]).map(t=>({task:t.task, due:t.due, start:t.start}))};
+            state.view = 'self-action';
+            render();
+          };
+        } else {
+          msg.innerHTML = `<div class="ci-note" style="color:var(--hold);">No CSV has been uploaded for ${esc(labelForDate(chosen))} yet, and no CSVs have been uploaded at all yet.</div>`;
+        }
+        return;
+      }
+      state.activeDate = chosen;
+      state.artistOrder = [artist];
+      state.artistTasks = {[artist]: (roster.tasks[artist]||[]).map(t=>({task:t.task, due:t.due, start:t.start}))};
+      state.view = 'self-action';
+      render();
+    };
   }
 
   // ---------- SELF ACTION CHOICE (check in, or just view assignments) ----------
@@ -1157,20 +1235,21 @@
         </button>
       </div>
       <div class="ci-navrow">
-        <button class="ci-btn" id="btn-self-action-back">&larr; Not me</button>
+        <button class="ci-btn" id="btn-self-action-back">&larr; Change date</button>
         <span></span>
       </div>
     `;
     document.getElementById('btn-self-do-checkin').onclick = () => {
-      state.calPickerOpen = false;
-      state.view = 'self-checkin-date';
+      state.checkin = {};
+      ensureCheckin(artist);
+      state.view = 'self-checkin';
       render();
     };
     document.getElementById('btn-self-do-assignments').onclick = () => {
       state.view = 'self-assignments';
       render();
     };
-    document.getElementById('btn-self-action-back').onclick = () => { state.view='self-name'; render(); };
+    document.getElementById('btn-self-action-back').onclick = () => { state.view='self-date'; render(); };
   }
 
   // ---------- SELF ASSIGNMENTS (read-only view of what's assigned) ----------
@@ -1253,67 +1332,12 @@
     `;
     document.getElementById('btn-assignments-back').onclick = () => { state.view='self-action'; render(); };
     document.getElementById('btn-assignments-checkin').onclick = () => {
-      state.calPickerOpen = false;
-      state.view = 'self-checkin-date';
-      render();
-    };
-  }
-
-  // ---------- SELF CHECK-IN DATE PICKER (shown only after choosing "Check in") ----------
-  function renderSelfCheckinDate(){
-    const artist = state.selectedSelfArtist;
-    if(!state.activeDate) state.activeDate = todayKey;
-    app.innerHTML = `
-      <div class="ci-hero">
-        <h1 class="ci-display">Which date?</h1>
-        <p>Which date is this check-in for? Defaults to today.</p>
-      </div>
-      <div class="ci-field">
-        ${renderDateFieldHTML(state.activeDate)}
-      </div>
-      <div id="self-checkin-date-message"></div>
-      <div class="ci-navrow">
-        <button class="ci-btn" id="btn-self-checkin-date-back">&larr; Back</button>
-        <button class="ci-btn primary" id="btn-self-checkin-date-continue">Continue &rarr;</button>
-      </div>
-    `;
-    document.getElementById('btn-self-checkin-date-back').onclick = () => { state.view='self-action'; render(); };
-    wireDateField((dateStr) => { state.activeDate = dateStr; render(); });
-
-    function proceedToCheckin(tasksForArtist){
-      state.artistOrder = [artist];
-      state.artistTasks = {[artist]: tasksForArtist};
       state.checkin = {};
       ensureCheckin(artist);
       state.view = 'self-checkin';
       render();
-    }
-
-    document.getElementById('btn-self-checkin-date-continue').onclick = async () => {
-      const chosen = state.activeDate || todayKey;
-      state.activeDate = chosen;
-      const roster = await loadRosterFromShared(chosen);
-      const msg = document.getElementById('self-checkin-date-message');
-      if(!roster || !roster.order || !roster.order.length){
-        msg.innerHTML = `
-          <div class="ci-note" style="color:var(--hold);">No tasks have been imported for ${esc(labelForDate(chosen))} yet.</div>
-          <button class="ci-btn" id="btn-self-checkin-continue-anyway">Continue anyway</button>
-        `;
-        document.getElementById('btn-self-checkin-continue-anyway').onclick = () => proceedToCheckin([]);
-        return;
-      }
-      if(roster.tasks[artist] && roster.tasks[artist].length){
-        proceedToCheckin(roster.tasks[artist].map(t=>({task:t.task, due:t.due, start:t.start})));
-        return;
-      }
-      msg.innerHTML = `
-        <div class="ci-note" style="color:var(--hold);">You don't have any tasks listed for ${esc(labelForDate(chosen))}, but you can still check in using "Other".</div>
-        <button class="ci-btn" id="btn-self-checkin-continue-anyway">Continue anyway</button>
-      `;
-      document.getElementById('btn-self-checkin-continue-anyway').onclick = () => proceedToCheckin([]);
     };
   }
-
   function renderSelfCheckin(){
     const artist = state.selectedSelfArtist;
     ensureCheckin(artist);
@@ -2003,6 +2027,11 @@
   }
 
   // init
+  document.getElementById('ci-home-btn').onclick = () => {
+    state.role = null;
+    state.view = 'landing';
+    render();
+  };
   render();
 })();
 </script>
