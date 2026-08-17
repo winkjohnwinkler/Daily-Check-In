@@ -14,6 +14,8 @@
   --progress:#5aa9c2;
   --hold:#d97a5a;
   --ready:#8fa3a3;
+  --danger:#e0524f;
+  --warning:#e8853d;
 }
 *{box-sizing:border-box;}
 .ci-root{
@@ -151,8 +153,14 @@
 .ci-submission-block:not(:first-child){border-top:1px dashed var(--line);padding-top:10px;margin-top:8px;}
 .ci-submission-time{font-size:10.5px;color:var(--accent);font-family:'IBM Plex Mono',monospace;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
 .ci-badge{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:10px;margin-left:6px;color:#0c2426;}
+.ci-label-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.ci-label-row .ci-label{margin-bottom:0;}
+.ci-urgency-badge{margin-left:0;color:#fff;font-weight:600;font-size:10.5px;padding:3px 9px;}
 .ci-histlist{list-style:none;padding:0;margin:0;}
 .ci-histlist li{padding:12px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+.ci-csv-row{padding:14px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+.ci-csv-row:last-child{border-bottom:none;}
+.ci-csv-row-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .ci-histlist li:hover{color:var(--accent);}
 .ci-empty{color:var(--text-dim);font-size:13px;padding:20px 0;}
 .ci-toplink{background:none;border:none;color:var(--text-dim);font-size:12.5px;cursor:pointer;text-decoration:underline;padding:0;}
@@ -246,6 +254,7 @@
     flashMessage:null,
     importResult:null,
     calPickerOpen:false,
+    confirmDeleteDate:null,
     calPickerYear:null,
     calPickerMonth:null,
     artistOrder:[],
@@ -315,6 +324,20 @@
       return [];
     }
   }
+  async function storageDelete(key, shared){
+    if(!API_URL || API_URL.indexOf('PASTE_YOUR') === 0){ lastStorageError = NO_API_MSG; return false; }
+    try{
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({action:'delete', key})
+      });
+      const data = await res.json();
+      return !!(data && data.ok);
+    }catch(e){
+      lastStorageError = (e && e.message) ? e.message : String(e);
+      return false;
+    }
+  }
 
   const DATES_KEY = 'entry-dates';
 
@@ -331,6 +354,22 @@
     const raw = await storageGet(rosterKey(dateKey), true);
     if(!raw) return null;
     try{ return JSON.parse(raw); }catch(e){ return null; }
+  }
+  // Discovers every date that has an uploaded roster by scanning storage directly —
+  // this naturally includes CSVs uploaded before this management screen existed,
+  // rather than relying on a separate registry that would miss older uploads.
+  async function listAllRosterDates(){
+    const keys = await storageList('roster:', true);
+    return keys.map(k => k.replace('roster:', '')).sort().reverse();
+  }
+  function summarizeRoster(roster){
+    if(!roster || !roster.order) return {artistCount:0, taskCount:0};
+    let taskCount = 0;
+    roster.order.forEach(a => { taskCount += (roster.tasks[a]||[]).length; });
+    return {artistCount: roster.order.length, taskCount};
+  }
+  async function deleteRosterForDate(dateKey){
+    return await storageDelete(rosterKey(dateKey), true);
   }
 
   async function recordEntryDate(dateKey){
@@ -451,9 +490,10 @@
       if(!artist) continue;
       const task = r[headerIdx.task] || '(untitled task)';
       const due = r[headerIdx.due] || '';
+      const taskStart = r[headerIdx.start] || '';
       const show = task.slice(0,3).toUpperCase() || 'UNK';
       if(!tasks[artist]){ tasks[artist]=[]; order.push(artist); }
-      tasks[artist].push({task, due, show});
+      tasks[artist].push({task, due, start: taskStart, show});
     }
     return {order, tasks};
   }
@@ -480,13 +520,13 @@
       state.artistOrder = state.rawArtistOrder.slice();
       state.artistTasks = {};
       state.rawArtistOrder.forEach(a=>{
-        state.artistTasks[a] = state.rawArtistTasks[a].map(t=>({task:t.task, due:t.due}));
+        state.artistTasks[a] = state.rawArtistTasks[a].map(t=>({task:t.task, due:t.due, start:t.start}));
       });
     } else {
       state.artistOrder = state.rawArtistOrder.filter(a => state.rawArtistTasks[a].some(t=>t.show===code));
       state.artistTasks = {};
       state.artistOrder.forEach(a=>{
-        state.artistTasks[a] = state.rawArtistTasks[a].filter(t=>t.show===code).map(t=>({task:t.task, due:t.due}));
+        state.artistTasks[a] = state.rawArtistTasks[a].filter(t=>t.show===code).map(t=>({task:t.task, due:t.due, start:t.start}));
       });
     }
   }
@@ -514,7 +554,7 @@
     if(state.view==='landing') return renderLanding();
     if(state.view==='prod-home') return renderProdHome();
     if(state.view==='prod-date-picker') return renderProdDatePicker();
-    if(state.view==='artist-date-picker') return renderArtistDatePicker();
+    if(state.view==='prod-manage-csv') return renderProdManageCsv();
     if(state.view==='import') return renderImport();
     if(state.view==='import-result') return renderImportResult();
     if(state.view==='select-show') return renderSelectShow();
@@ -522,6 +562,9 @@
     if(state.view==='checkin') return renderCheckin();
     if(state.view==='summary') return renderSummary();
     if(state.view==='self-name') return renderSelfName();
+    if(state.view==='self-action') return renderSelfAction();
+    if(state.view==='self-assignments') return renderSelfAssignments();
+    if(state.view==='self-checkin-date') return renderSelfCheckinDate();
     if(state.view==='self-checkin') return renderSelfCheckin();
     if(state.view==='self-done') return renderSelfDone();
     if(state.view==='report') return renderReport();
@@ -655,16 +698,26 @@
           <span class="ci-landing-sub">Find your name and fill out your own status</span>
         </button>
       </div>
+      <div id="landing-message"></div>
     `;
     document.getElementById('btn-role-production').onclick = () => {
       state.role = 'production';
       state.view = 'prod-home';
       render();
     };
-    document.getElementById('btn-role-artist').onclick = () => {
+    document.getElementById('btn-role-artist').onclick = async () => {
       state.role = 'artist';
       state.calPickerOpen = false;
-      state.view = 'artist-date-picker';
+      state.activeDate = todayKey;
+      const roster = await loadRosterFromShared(todayKey);
+      const msg = document.getElementById('landing-message');
+      if(!roster || !roster.order || !roster.order.length){
+        if(msg) msg.innerHTML = `<div class="ci-note" style="color:var(--hold);">No tasks have been imported for today (${esc(labelForDate(todayKey))}) yet. Check with your production team.</div>`;
+        return;
+      }
+      state.rawArtistOrder = roster.order;
+      state.rawArtistTasks = roster.tasks;
+      state.view = 'self-name';
       render();
     };
   }
@@ -685,12 +738,16 @@
           <span class="ci-landing-sub">Upload the Airtable export for a specific day</span>
         </button>
         <button class="ci-landing-card" id="btn-prod-checkin">
-          <span class="ci-landing-title">Run a check-in</span>
+          <span class="ci-landing-title">Run a Stand Up</span>
           <span class="ci-landing-sub">Step through your team yourself for a date's roster</span>
         </button>
         <button class="ci-landing-card" id="btn-prod-report">
           <span class="ci-landing-title">View report</span>
           <span class="ci-landing-sub">See everything submitted so far, by anyone</span>
+        </button>
+        <button class="ci-landing-card" id="btn-prod-manage-csv">
+          <span class="ci-landing-title">Manage CSVs</span>
+          <span class="ci-landing-sub">See what's uploaded per date, replace or delete one</span>
         </button>
       </div>
       <div class="ci-navrow"><button class="ci-btn" id="btn-prod-back">&larr; Back</button><span></span></div>
@@ -698,13 +755,14 @@
     document.getElementById('btn-prod-import').onclick = () => { state.prodDateMode='import'; state.calPickerOpen=false; state.view='prod-date-picker'; render(); };
     document.getElementById('btn-prod-checkin').onclick = () => { state.prodDateMode='checkin'; state.calPickerOpen=false; state.view='prod-date-picker'; render(); };
     document.getElementById('btn-prod-report').onclick = () => { state.reportDate=null; state.reportShowFilter='ALL'; state.view='report'; render(); };
+    document.getElementById('btn-prod-manage-csv').onclick = () => { state.confirmDeleteDate=null; state.view='prod-manage-csv'; render(); };
     document.getElementById('btn-prod-back').onclick = () => { state.role=null; state.view='landing'; render(); };
   }
 
   // ---------- PRODUCTION DATE PICKER (shared by "Submit CSV" and "Run a check-in") ----------
   function renderProdDatePicker(){
     const mode = state.prodDateMode;
-    const title = mode === 'import' ? 'Which date is this CSV for?' : 'Which date do you want to check in for?';
+    const title = mode === 'import' ? 'Which date is this CSV for?' : 'Which date do you want to run a Stand Up for?';
     if(!state.activeDate) state.activeDate = todayKey;
     app.innerHTML = `
       <div class="ci-hero">
@@ -757,39 +815,74 @@
     };
   }
 
-  // ---------- ARTIST DATE PICKER ----------
-  function renderArtistDatePicker(){
-    if(!state.activeDate) state.activeDate = todayKey;
+  // ---------- MANAGE CSVs (view / replace / delete uploaded rosters per date) ----------
+  async function renderProdManageCsv(){
+    const dates = await listAllRosterDates();
+    const rows = await Promise.all(dates.map(async d=>{
+      const roster = await loadRosterFromShared(d);
+      return {date: d, summary: summarizeRoster(roster)};
+    }));
+
+    const itemsHtml = rows.length ? rows.map(r=>{
+      const confirming = state.confirmDeleteDate === r.date;
+      return `
+        <div class="ci-csv-row">
+          <div>
+            <div class="ci-sum-name">${esc(labelForDate(r.date))}</div>
+            <div class="ci-artist-row-meta">${r.summary.artistCount} artist${r.summary.artistCount===1?'':'s'} &middot; ${r.summary.taskCount} task${r.summary.taskCount===1?'':'s'}</div>
+          </div>
+          ${confirming ? `
+            <div class="ci-csv-row-actions">
+              <span style="color:var(--hold);font-size:12.5px;">Delete this CSV?</span>
+              <button class="ci-btn" data-action="cancel-delete" data-date="${esc(r.date)}">Cancel</button>
+              <button class="ci-btn" style="border-color:var(--hold);color:var(--hold);" data-action="confirm-delete" data-date="${esc(r.date)}">Yes, delete</button>
+            </div>
+          ` : `
+            <div class="ci-csv-row-actions">
+              <button class="ci-btn ghost" data-action="replace-csv" data-date="${esc(r.date)}">Replace</button>
+              <button class="ci-btn ghost" style="color:var(--hold);" data-action="delete-csv" data-date="${esc(r.date)}">Delete</button>
+            </div>
+          `}
+        </div>
+      `;
+    }).join('') : '<div class="ci-empty">No CSVs uploaded yet.</div>';
+
     app.innerHTML = `
       <div class="ci-hero">
-        <h1 class="ci-display">Which date?</h1>
-        <p>Pick the date you're checking in for &mdash; defaults to today.</p>
+        <h1 class="ci-display">Manage CSVs</h1>
+        <p>Every date with an uploaded roster. Replace one to update it, or delete it entirely.</p>
       </div>
-      <div class="ci-field">
-        ${renderDateFieldHTML(state.activeDate)}
+      <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;padding:6px 20px;">
+        ${itemsHtml}
       </div>
-      <div id="artist-date-message"></div>
-      <div class="ci-navrow">
-        <button class="ci-btn" id="btn-artist-date-back">&larr; Back</button>
-        <button class="ci-btn primary" id="btn-artist-date-continue">Continue &rarr;</button>
-      </div>
+      <div class="ci-navrow"><button class="ci-btn" id="btn-manage-csv-back">&larr; Back</button><span></span></div>
     `;
-    document.getElementById('btn-artist-date-back').onclick = () => { state.role=null; state.view='landing'; render(); };
-    wireDateField((dateStr) => { state.activeDate = dateStr; render(); });
-    document.getElementById('btn-artist-date-continue').onclick = async () => {
-      const chosen = state.activeDate || todayKey;
-      const roster = await loadRosterFromShared(chosen);
-      if(!roster || !roster.order || !roster.order.length){
-        document.getElementById('artist-date-message').innerHTML =
-          `<div class="ci-note" style="color:var(--hold);">No tasks have been imported for ${esc(labelForDate(chosen))} yet. Check with your production team.</div>`;
-        return;
-      }
-      state.activeDate = chosen;
-      state.rawArtistOrder = roster.order;
-      state.rawArtistTasks = roster.tasks;
-      state.view = 'self-name';
-      render();
-    };
+
+    document.getElementById('btn-manage-csv-back').onclick = () => { state.confirmDeleteDate=null; state.view='prod-home'; render(); };
+    document.querySelectorAll('[data-action="replace-csv"]').forEach(btn=>{
+      btn.onclick = () => {
+        state.activeDate = btn.dataset.date;
+        state.prodDateMode = 'import';
+        state.view = 'import';
+        render();
+      };
+    });
+    document.querySelectorAll('[data-action="delete-csv"]').forEach(btn=>{
+      btn.onclick = () => { state.confirmDeleteDate = btn.dataset.date; render(); };
+    });
+    document.querySelectorAll('[data-action="cancel-delete"]').forEach(btn=>{
+      btn.onclick = () => { state.confirmDeleteDate = null; render(); };
+    });
+    document.querySelectorAll('[data-action="confirm-delete"]').forEach(btn=>{
+      btn.onclick = async () => {
+        const date = btn.dataset.date;
+        btn.disabled = true;
+        btn.textContent = 'Deleting…';
+        await deleteRosterForDate(date);
+        state.confirmDeleteDate = null;
+        render();
+      };
+    });
   }
 
   // ---------- IMPORT VIEW ----------
@@ -1022,7 +1115,7 @@
     app.innerHTML = `
       <div class="ci-hero">
         <h1 class="ci-display">Find your name</h1>
-        <p>Pick yourself from the list below to fill out today's check-in. Each check-in is logged separately, so feel free to check in again any time your status changes.</p>
+        <p>Pick yourself from the list below.</p>
       </div>
       <ul class="ci-histlist ci-artist-list">${rows.join('')}</ul>
       <div class="ci-navrow">
@@ -1036,14 +1129,189 @@
         const artist = state.rawArtistOrder[idx];
         state.selectedSelfArtist = artist;
         state.artistOrder = [artist];
-        state.artistTasks = {[artist]: (state.rawArtistTasks[artist]||[]).map(t=>({task:t.task, due:t.due}))};
-        state.checkin = {};
-        ensureCheckin(artist);
-        state.view = 'self-checkin';
+        state.artistTasks = {[artist]: (state.rawArtistTasks[artist]||[]).map(t=>({task:t.task, due:t.due, start:t.start}))};
+        state.view = 'self-action';
         render();
       };
     });
-    document.getElementById('btn-self-back').onclick = () => { state.view='artist-date-picker'; render(); };
+    document.getElementById('btn-self-back').onclick = () => { state.view='landing'; render(); };
+  }
+
+  // ---------- SELF ACTION CHOICE (check in, or just view assignments) ----------
+  function renderSelfAction(){
+    const artist = state.selectedSelfArtist;
+    const count = taskOptionsFor(artist).length;
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">${esc(artist)}</h1>
+        <p>${count} task${count===1?'':'s'} assigned for ${esc(labelForDate(state.activeDate))}. What would you like to do?</p>
+      </div>
+      <div class="ci-landing-grid">
+        <button class="ci-landing-card" id="btn-self-do-checkin">
+          <span class="ci-landing-title">Check in</span>
+          <span class="ci-landing-sub">Log your status, pace, and any blockers</span>
+        </button>
+        <button class="ci-landing-card" id="btn-self-do-assignments">
+          <span class="ci-landing-title">View my assignments</span>
+          <span class="ci-landing-sub">Just see what's assigned to you, no check-in needed</span>
+        </button>
+      </div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-self-action-back">&larr; Not me</button>
+        <span></span>
+      </div>
+    `;
+    document.getElementById('btn-self-do-checkin').onclick = () => {
+      state.calPickerOpen = false;
+      state.view = 'self-checkin-date';
+      render();
+    };
+    document.getElementById('btn-self-do-assignments').onclick = () => {
+      state.view = 'self-assignments';
+      render();
+    };
+    document.getElementById('btn-self-action-back').onclick = () => { state.view='self-name'; render(); };
+  }
+
+  // ---------- SELF ASSIGNMENTS (read-only view of what's assigned) ----------
+  function parseLooseDate(str){
+    if(!str) return null;
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // Local midnight for "today" — avoids the off-by-one-day bug that comes from
+  // parsing a bare "YYYY-MM-DD" string, which JS treats as UTC midnight.
+  function todayAsDate(){
+    const p = parseYmd(todayKey);
+    return new Date(p.y, p.m, p.d);
+  }
+  // Counts weekdays strictly after fromDate, up through and including toDate.
+  function businessDaysBetween(fromDate, toDate){
+    let count = 0;
+    let d = new Date(fromDate);
+    d.setDate(d.getDate()+1);
+    while(d <= toDate){
+      const dow = d.getDay();
+      if(dow !== 0 && dow !== 6) count++;
+      d.setDate(d.getDate()+1);
+    }
+    return count;
+  }
+  // Auto-computed urgency for a task, based on its start/due dates from Airtable —
+  // not something anyone selects manually.
+  function computeTaskUrgency(startStr, dueStr){
+    const today = todayAsDate();
+    const start = parseLooseDate(startStr);
+    const due = parseLooseDate(dueStr);
+
+    if(start && start > today){
+      const bdays = businessDaysBetween(today, start);
+      if(bdays <= 5) return {label:'Upcoming Task', colorVar:'--progress'};
+      return null;
+    }
+    if(!due) return null;
+    if(due < today) return {label:'Overdue', colorVar:'--danger'};
+    const diffDays = Math.round((due - today) / 86400000);
+    if(diffDays <= 2) return {label:'At Risk', colorVar:'--warning'};
+    return {label:'On Track', colorVar:'--complete'};
+  }
+
+  function renderSelfAssignments(){
+    const artist = state.selectedSelfArtist;
+    const tasks = taskOptionsFor(artist).slice().sort((a,b)=>{
+      const da = parseLooseDate(a.due), db = parseLooseDate(b.due);
+      if(da && db) return da - db;
+      if(da) return -1;
+      if(db) return 1;
+      return 0;
+    });
+    const todayDate = todayAsDate();
+
+    const rows = tasks.length ? tasks.map(t=>{
+      const dueDate = parseLooseDate(t.due);
+      const isOverdue = dueDate && todayDate && dueDate < todayDate;
+      return `
+        <div class="ci-sum-task">
+          ${esc(t.task)}
+          ${t.due ? `<span class="ci-mono" style="color:${isOverdue?'var(--hold)':'var(--text-dim)'};">${isOverdue?' &#9888; overdue — ':' due '}${esc(t.due)}</span>` : ''}
+        </div>
+      `;
+    }).join('') : '<div class="ci-empty">No tasks assigned.</div>';
+
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">${esc(artist)}</h1>
+        <p>Your assignments for ${esc(labelForDate(state.activeDate))} &mdash; ${tasks.length} task${tasks.length===1?'':'s'}.</p>
+      </div>
+      <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">
+        ${rows}
+      </div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-assignments-back">&larr; Back</button>
+        <button class="ci-btn primary" id="btn-assignments-checkin">Check in instead</button>
+      </div>
+    `;
+    document.getElementById('btn-assignments-back').onclick = () => { state.view='self-action'; render(); };
+    document.getElementById('btn-assignments-checkin').onclick = () => {
+      state.calPickerOpen = false;
+      state.view = 'self-checkin-date';
+      render();
+    };
+  }
+
+  // ---------- SELF CHECK-IN DATE PICKER (shown only after choosing "Check in") ----------
+  function renderSelfCheckinDate(){
+    const artist = state.selectedSelfArtist;
+    if(!state.activeDate) state.activeDate = todayKey;
+    app.innerHTML = `
+      <div class="ci-hero">
+        <h1 class="ci-display">Which date?</h1>
+        <p>Which date is this check-in for? Defaults to today.</p>
+      </div>
+      <div class="ci-field">
+        ${renderDateFieldHTML(state.activeDate)}
+      </div>
+      <div id="self-checkin-date-message"></div>
+      <div class="ci-navrow">
+        <button class="ci-btn" id="btn-self-checkin-date-back">&larr; Back</button>
+        <button class="ci-btn primary" id="btn-self-checkin-date-continue">Continue &rarr;</button>
+      </div>
+    `;
+    document.getElementById('btn-self-checkin-date-back').onclick = () => { state.view='self-action'; render(); };
+    wireDateField((dateStr) => { state.activeDate = dateStr; render(); });
+
+    function proceedToCheckin(tasksForArtist){
+      state.artistOrder = [artist];
+      state.artistTasks = {[artist]: tasksForArtist};
+      state.checkin = {};
+      ensureCheckin(artist);
+      state.view = 'self-checkin';
+      render();
+    }
+
+    document.getElementById('btn-self-checkin-date-continue').onclick = async () => {
+      const chosen = state.activeDate || todayKey;
+      state.activeDate = chosen;
+      const roster = await loadRosterFromShared(chosen);
+      const msg = document.getElementById('self-checkin-date-message');
+      if(!roster || !roster.order || !roster.order.length){
+        msg.innerHTML = `
+          <div class="ci-note" style="color:var(--hold);">No tasks have been imported for ${esc(labelForDate(chosen))} yet.</div>
+          <button class="ci-btn" id="btn-self-checkin-continue-anyway">Continue anyway</button>
+        `;
+        document.getElementById('btn-self-checkin-continue-anyway').onclick = () => proceedToCheckin([]);
+        return;
+      }
+      if(roster.tasks[artist] && roster.tasks[artist].length){
+        proceedToCheckin(roster.tasks[artist].map(t=>({task:t.task, due:t.due, start:t.start})));
+        return;
+      }
+      msg.innerHTML = `
+        <div class="ci-note" style="color:var(--hold);">You don't have any tasks listed for ${esc(labelForDate(chosen))}, but you can still check in using "Other".</div>
+        <button class="ci-btn" id="btn-self-checkin-continue-anyway">Continue anyway</button>
+      `;
+      document.getElementById('btn-self-checkin-continue-anyway').onclick = () => proceedToCheckin([]);
+    };
   }
 
   function renderSelfCheckin(){
@@ -1060,7 +1328,7 @@
         <div class="ci-artist-name ci-display">${esc(artist)}</div>
         <div class="ci-sub">${taskOptionsFor(artist).length} task${taskOptionsFor(artist).length===1?'':'s'} assigned in Airtable</div>
         <div id="rows-container">
-          ${entries.map((e,i)=>taskRowHTML(artist,e,i,entries.length)).join('')}
+          ${entries.map((e,i)=>taskRowHTML(artist,e,i,entries.length,{showPace:false})).join('')}
         </div>
         <button class="ci-addtask" id="btn-add-row">+ Add another task</button>
         <div class="ci-navrow">
@@ -1123,16 +1391,22 @@
     return state.artistTasks[artist] || [];
   }
 
-  function taskRowHTML(artist, entry, idx, total){
+  function taskRowHTML(artist, entry, idx, total, opts2){
+    const showPace = !opts2 || opts2.showPace !== false;
     const opts = taskOptionsFor(artist);
     const optionsHtml = opts.map((t,i)=>
       `<option value="${i}" ${String(entry.taskChoice)===String(i)?'selected':''}>${esc(t.task)}</option>`
     ).join('');
     const isOther = entry.taskChoice === 'other';
     let dueBlock = '';
+    let urgencyPillHtml = '';
     if(entry.taskChoice !== '' && !isOther){
       const t = opts[entry.taskChoice];
       dueBlock = `<div class="ci-field"><span class="ci-label">Due date (from Airtable)</span><span class="ci-due-display">${esc(t && t.due ? t.due : '—')}</span></div>`;
+      if(t){
+        const urgency = computeTaskUrgency(t.start, t.due);
+        if(urgency) urgencyPillHtml = `<span class="ci-badge ci-urgency-badge" style="background:var(${urgency.colorVar});">${esc(urgency.label)}</span>`;
+      }
     } else if(isOther){
       dueBlock = `<div class="ci-field"><label class="ci-label">Deadline (optional)</label><input class="ci-input" type="text" data-role="due" value="${esc(entry.due)}" placeholder="e.g. 8/22"></div>`;
     }
@@ -1140,7 +1414,10 @@
       <div class="ci-task-row" data-idx="${idx}">
         ${total>1 ? `<button class="ci-remove" data-action="remove-row" data-idx="${idx}" title="Remove task">&times;</button>` : ''}
         <div class="ci-field">
-          <label class="ci-label">Current task</label>
+          <div class="ci-label-row">
+            <label class="ci-label">Current task</label>
+            ${urgencyPillHtml}
+          </div>
           <select class="ci-select" data-role="taskChoice">
             <option value="">Select a task&hellip;</option>
             ${optionsHtml}
@@ -1159,6 +1436,7 @@
               </label>`).join('')}
           </div>
         </div>
+        ${showPace ? `
         <div class="ci-field">
           <label class="ci-label">On pace for deadline?</label>
           <div class="ci-pillrow" data-role="pace-group">
@@ -1169,6 +1447,7 @@
               </label>`).join('')}
           </div>
         </div>
+        ` : ''}
         <div class="ci-field">
           <label class="ci-label">Any blockers?</label>
           <div class="ci-pillrow" data-role="blocker-group">
