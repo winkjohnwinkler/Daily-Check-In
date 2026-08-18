@@ -97,7 +97,7 @@
 .ci-pill input:checked + span{color:var(--bg);border-color:transparent;}
 .ci-pill.status-Complete input:checked + span{background:var(--complete);}
 .ci-pill.status-In-Progress input:checked + span{background:var(--progress);}
-.ci-pill.status-On-Hold input:checked + span{background:var(--hold);}
+.ci-pill.status-Hold input:checked + span{background:var(--hold);}
 .ci-pill.status-Ready-to-Begin input:checked + span{background:var(--ready);}
 .ci-pill.pace-On-Track input:checked + span{background:var(--complete);}
 .ci-pill.pace-At-Risk input:checked + span{background:var(--accent);}
@@ -185,6 +185,9 @@
 .ci-artist-row-name{font-weight:600;font-size:14.5px;}
 .ci-artist-row-meta{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
 .ci-artist-row-done{color:var(--complete);}
+.ci-remove-artist{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;border-radius:4px;}
+.ci-remove-artist:hover{color:var(--hold);background:rgba(255,255,255,.05);}
+.ci-add-artist-form{background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:16px;}
 .ci-date-field{position:relative;display:inline-block;}
 .ci-date-display{
   background:var(--bg);border:1px solid var(--line);color:var(--text);
@@ -239,10 +242,10 @@
 
 <script>
 (function(){
-  const STATUS_OPTS = ['Ready to Begin','In Progress','On Hold','Complete'];
+  const STATUS_OPTS = ['Complete','In Progress','Ready to Begin','Hold'];
   const PACE_OPTS = ['On Track','At Risk','Behind','N/A'];
   const BLOCKER_OPTS = ['Yes','No'];
-  const STATUS_COLOR = {'Ready to Begin':'var(--ready)','In Progress':'var(--progress)','On Hold':'var(--hold)','Complete':'var(--complete)'};
+  const STATUS_COLOR = {'Ready to Begin':'var(--ready)','In Progress':'var(--progress)','Hold':'var(--hold)','Complete':'var(--complete)'};
   const PACE_COLOR = {'On Track':'var(--complete)','At Risk':'var(--accent)','Behind':'var(--hold)','N/A':'var(--ready)'};
 
   const today = new Date();
@@ -258,10 +261,12 @@
     role:null,            // 'production' | 'artist'
     activeDate:todayKey,  // the date whose roster/check-in we're working with
     prodDateMode:null,    // 'import' | 'checkin' — what the production date-picker screen is for
+    importContext:'manage', // 'manage' | 'standup' — where to go after a successful CSV upload
     flashMessage:null,
     importResult:null,
     calPickerOpen:false,
     confirmDeleteDate:null,
+    showAddArtistForm:false,
     calPickerYear:null,
     calPickerMonth:null,
     artistOrder:[],
@@ -511,14 +516,31 @@
     return {order, tasks};
   }
 
-  // Summarizes the shows found in the raw import: code, how many artists, how many tasks
+  // Fixed show groupings — codes within a group are combined under one label
+  // for selection purposes. Any code not covered here falls back to its own group.
+  const SHOW_GROUPS = [
+    { label: 'ELS/ELW', codes: ['ELS','ELW'] },
+    { label: 'ALC/ALB', codes: ['ALC','ALB'] },
+    { label: 'BLF', codes: ['BLF'] }
+  ];
+  function groupLabelForCode(code){
+    const g = SHOW_GROUPS.find(g => g.codes.includes(code));
+    return g ? g.label : code;
+  }
+  function codesForGroupLabel(label){
+    const g = SHOW_GROUPS.find(g => g.label === label);
+    return g ? g.codes : [label];
+  }
+
+  // Summarizes the show groups found in the raw import: group label, how many artists, how many tasks
   function getShowSummary(){
     const map = {};
     state.rawArtistOrder.forEach(artist=>{
       (state.rawArtistTasks[artist]||[]).forEach(t=>{
-        if(!map[t.show]) map[t.show] = {artists:new Set(), taskCount:0};
-        map[t.show].artists.add(artist);
-        map[t.show].taskCount++;
+        const label = groupLabelForCode(t.show);
+        if(!map[label]) map[label] = {artists:new Set(), taskCount:0};
+        map[label].artists.add(artist);
+        map[label].taskCount++;
       });
     });
     return Object.keys(map).sort().map(code=>({
@@ -526,7 +548,7 @@
     }));
   }
 
-  // Filters the raw (all-shows) import down to just one show code, or 'ALL' for everyone
+  // Filters the raw (all-shows) import down to just one show group, or 'ALL' for everyone
   function applyShowFilter(code){
     state.selectedShow = code;
     if(code === 'ALL'){
@@ -536,10 +558,11 @@
         state.artistTasks[a] = state.rawArtistTasks[a].map(t=>({task:t.task, due:t.due, start:t.start}));
       });
     } else {
-      state.artistOrder = state.rawArtistOrder.filter(a => state.rawArtistTasks[a].some(t=>t.show===code));
+      const codes = codesForGroupLabel(code);
+      state.artistOrder = state.rawArtistOrder.filter(a => state.rawArtistTasks[a].some(t=>codes.includes(t.show)));
       state.artistTasks = {};
       state.artistOrder.forEach(a=>{
-        state.artistTasks[a] = state.rawArtistTasks[a].filter(t=>t.show===code).map(t=>({task:t.task, due:t.due, start:t.start}));
+        state.artistTasks[a] = state.rawArtistTasks[a].filter(t=>codes.includes(t.show)).map(t=>({task:t.task, due:t.due, start:t.start}));
       });
     }
   }
@@ -548,6 +571,7 @@
     applyShowFilter(code);
     state.currentIndex = 0;
     state.checkin = {};
+    state.showAddArtistForm = false;
     if(!state.artistOrder.length){ state.artistOrder = ['(unnamed artist)']; }
     state.artistOrder.forEach(a => ensureCheckin(a));
     state.view = 'select-artist';
@@ -555,7 +579,7 @@
   }
 
   function blankEntry(){
-    return {taskChoice:'', otherText:'', due:'', status:'', pace:'', hasBlocker:'', blockerText:'', notes:''};
+    return {taskChoice:'', otherText:'', due:'', status:'In Progress', pace:'', hasBlocker:'', blockerText:'', notes:''};
   }
   function ensureCheckin(artist){
     if(!state.checkin[artist] || !state.checkin[artist].entries.length){
@@ -689,7 +713,7 @@
   function countBlockers(){
     let n=0;
     Object.values(state.checkin).forEach(c=>{
-      (c.entries||[]).forEach(e=>{ if(e.status==='On Hold' || e.pace==='Behind') n++; });
+      (c.entries||[]).forEach(e=>{ if(e.status==='Hold' || e.pace==='Behind') n++; });
     });
     return n;
   }
@@ -820,6 +844,7 @@
         `;
         document.getElementById('btn-prod-date-submit-instead').onclick = () => {
           state.prodDateMode = 'import';
+          state.importContext = 'standup';
           state.view = 'import';
           render();
         };
@@ -898,6 +923,7 @@
 
     document.getElementById('btn-manage-upload-new').onclick = () => {
       state.prodDateMode = 'import';
+      state.importContext = 'manage';
       state.calPickerOpen = false;
       state.view = 'prod-date-picker';
       render();
@@ -907,6 +933,7 @@
       btn.onclick = () => {
         state.activeDate = btn.dataset.date;
         state.prodDateMode = 'import';
+        state.importContext = 'manage';
         state.view = 'import';
         render();
       };
@@ -1020,7 +1047,7 @@
       const verify = await loadRosterFromShared(state.activeDate);
       const verified = !!(verify && verify.order && verify.order.length === order.length);
 
-      state.importResult = {success: verified, count: order.length, date: state.activeDate, errorText: verified ? null : lastStorageError};
+      state.importResult = {success: verified, count: order.length, date: state.activeDate, errorText: verified ? null : lastStorageError, context: state.importContext || 'manage'};
       state.view = 'import-result';
       render();
     };
@@ -1030,13 +1057,14 @@
   function renderImportResult(){
     const r = state.importResult || {};
     const dateLabel = labelForDate(r.date);
+    const backLabel = r.context === 'standup' ? 'Continue to the Stand Up' : 'Done — back to Manage CSVs';
     app.innerHTML = r.success ? `
       <div class="ci-hero">
         <h1 class="ci-display">Saved</h1>
         <p>${r.count} artist${r.count===1?'':'s'} saved for ${esc(dateLabel)}, and confirmed readable back from storage.</p>
       </div>
       <div class="ci-navrow">
-        <button class="ci-btn primary" id="btn-import-done">Done &mdash; back to Manage CSVs</button>
+        <button class="ci-btn primary" id="btn-import-done">${esc(backLabel)}</button>
         <span></span>
       </div>
     ` : `
@@ -1051,7 +1079,21 @@
         <button class="ci-btn primary" id="btn-import-done">Back to Manage CSVs anyway</button>
       </div>
     `;
-    document.getElementById('btn-import-done').onclick = () => { state.view='prod-manage-csv'; render(); };
+    document.getElementById('btn-import-done').onclick = async () => {
+      if(r.success && r.context === 'standup'){
+        state.rawArtistOrder = state.rawArtistOrder; // already set from the upload step
+        const shows = getShowSummary();
+        if(shows.length <= 1){
+          await goToCheckinForShow(shows.length ? shows[0].code : 'ALL');
+        } else {
+          state.view = 'select-show';
+          render();
+        }
+        return;
+      }
+      state.view='prod-manage-csv';
+      render();
+    };
     const retryBtn = document.getElementById('btn-import-retry');
     if(retryBtn) retryBtn.onclick = () => { state.view='import'; render(); };
   }
@@ -1095,19 +1137,40 @@
     const showLabel = (state.selectedShow && state.selectedShow !== 'ALL') ? state.selectedShow : 'All Shows';
     const cameFromCheckin = !!state.artistPickerReturn;
     const rows = state.artistOrder.map((a,i)=>{
-      const count = taskOptionsFor(a).length;
       const done = hasContent(a);
       const isCurrent = cameFromCheckin && i === state.artistPickerReturn.index;
       return `
         <li class="ci-artist-row${isCurrent ? ' current' : ''}" data-idx="${i}">
           <span class="ci-artist-row-name">${esc(a)}${isCurrent ? ' <span class="ci-artist-row-tag">current</span>' : ''}</span>
           <span class="ci-artist-row-meta">
-            ${count} task${count===1?'':'s'}
             ${done ? '<span class="ci-artist-row-done">&#10003; logged</span>' : ''}
+            <button type="button" class="ci-remove-artist" data-remove-idx="${i}" title="Remove from this list">&times;</button>
           </span>
         </li>
       `;
     }).join('');
+
+    const availableToAdd = state.rawArtistOrder.filter(a => !state.artistOrder.includes(a));
+    const addFormHtml = state.showAddArtistForm ? `
+      <div class="ci-add-artist-form">
+        <div class="ci-field">
+          <label class="ci-label">Add someone to this list</label>
+          <select class="ci-select" id="add-artist-select">
+            <option value="">Choose an artist&hellip;</option>
+            ${availableToAdd.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}
+            <option value="__other__">Someone else (type a name)</option>
+          </select>
+        </div>
+        <div class="ci-field" id="add-artist-other-wrap" style="display:none;">
+          <label class="ci-label">Full name</label>
+          <input class="ci-input" type="text" id="add-artist-other-input" placeholder="Full name">
+        </div>
+        <div class="ci-navrow-links" style="justify-content:flex-start;">
+          <button class="ci-btn" id="btn-add-artist-cancel">Cancel</button>
+          <button class="ci-btn primary" id="btn-add-artist-confirm">Add</button>
+        </div>
+      </div>
+    ` : `<button class="ci-toplink" id="btn-add-artist-toggle">+ Add artist</button>`;
 
     app.innerHTML = `
       <div class="ci-hero">
@@ -1115,16 +1178,30 @@
         <p>${cameFromCheckin ? 'Pick who to check in with next.' : "Choose who to check in with first. You can jump between artists freely once you're in."}</p>
       </div>
       <ul class="ci-histlist ci-artist-list">${rows}</ul>
+      <div style="margin:14px 0;">${addFormHtml}</div>
       <div class="ci-navrow">
         <button class="ci-btn" id="btn-back-to-shows">&larr; ${cameFromCheckin ? 'Back to check-in' : 'Back to shows'}</button>
         <span></span>
       </div>
     `;
     document.querySelectorAll('.ci-artist-row').forEach(li=>{
-      li.onclick = () => {
+      li.onclick = (ev) => {
+        if(ev.target.closest('[data-remove-idx]')) return;
         state.currentIndex = parseInt(li.dataset.idx, 10);
         state.artistPickerReturn = null;
         state.view = 'checkin';
+        render();
+      };
+    });
+    document.querySelectorAll('[data-remove-idx]').forEach(btn=>{
+      btn.onclick = (ev) => {
+        ev.stopPropagation();
+        const i = parseInt(btn.dataset.removeIdx, 10);
+        const removedArtist = state.artistOrder[i];
+        state.artistOrder.splice(i,1);
+        delete state.artistTasks[removedArtist];
+        delete state.checkin[removedArtist];
+        if(!state.artistOrder.length) state.artistOrder = ['(unnamed artist)'];
         render();
       };
     });
@@ -1140,6 +1217,28 @@
       state.view = shows.length > 1 ? 'select-show' : 'prod-home';
       render();
     };
+
+    const toggleBtn = document.getElementById('btn-add-artist-toggle');
+    if(toggleBtn){
+      toggleBtn.onclick = () => { state.showAddArtistForm = true; render(); };
+    } else {
+      const sel = document.getElementById('add-artist-select');
+      const otherWrap = document.getElementById('add-artist-other-wrap');
+      sel.onchange = () => { otherWrap.style.display = sel.value === '__other__' ? 'block' : 'none'; };
+      document.getElementById('btn-add-artist-cancel').onclick = () => { state.showAddArtistForm = false; render(); };
+      document.getElementById('btn-add-artist-confirm').onclick = () => {
+        const nameToAdd = (sel.value === '__other__')
+          ? document.getElementById('add-artist-other-input').value.trim()
+          : sel.value;
+        if(!nameToAdd || state.artistOrder.includes(nameToAdd)){ state.showAddArtistForm = false; render(); return; }
+        if(state.artistOrder[0] === '(unnamed artist)' && state.artistOrder.length===1) state.artistOrder = [];
+        state.artistOrder.push(nameToAdd);
+        state.artistTasks[nameToAdd] = (state.rawArtistTasks[nameToAdd] || []).map(t=>({task:t.task, due:t.due, start:t.start}));
+        ensureCheckin(nameToAdd);
+        state.showAddArtistForm = false;
+        render();
+      };
+    }
   }
 
   // ---------- SELF-SERVE VIEWS (artist fills out their own check-in) ----------
@@ -1345,7 +1444,7 @@
     app.innerHTML = `
       <div class="ci-hero">
         <h1 class="ci-display">${esc(artist)}</h1>
-        <p>From the most recently uploaded CSV (${esc(labelForDate(state.activeDate))}) &mdash; ${tasks.length} task${tasks.length===1?'':'s'}.</p>
+        <p>From the most recently uploaded CSV (${esc(labelForDate(state.activeDate))}).</p>
       </div>
       <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">
         ${rows}
@@ -1374,7 +1473,6 @@
       </div>
       <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">
         <div class="ci-artist-name ci-display">${esc(artist)}</div>
-        <div class="ci-sub">${taskOptionsFor(artist).length} task${taskOptionsFor(artist).length===1?'':'s'} assigned in Airtable</div>
         <div id="rows-container">
           ${entries.map((e,i)=>taskRowHTML(artist,e,i,entries.length,{showPace:false})).join('')}
         </div>
@@ -1468,8 +1566,8 @@
           </div>
           <select class="ci-select" data-role="taskChoice">
             <option value="">Select a task&hellip;</option>
+            <option value="other" ${isOther?'selected':''}>Add a Task</option>
             ${optionsHtml}
-            <option value="other" ${isOther?'selected':''}>Other (not listed in Airtable)</option>
           </select>
         </div>
         ${isOther ? `<div class="ci-field"><label class="ci-label">Describe the task</label><input class="ci-input" type="text" data-role="otherText" value="${esc(entry.otherText)}" placeholder="What are they working on?"></div>` : ''}
@@ -1546,7 +1644,6 @@
       </div>
       <div class="ci-card">
         <div class="ci-artist-name ci-display">${esc(artist)}</div>
-        <div class="ci-sub">${taskOptionsFor(artist).length} task${taskOptionsFor(artist).length===1?'':'s'} assigned in Airtable</div>
         <div id="rows-container">
           ${entries.map((e,i)=>taskRowHTML(artist,e,i,entries.length)).join('')}
         </div>
@@ -1555,6 +1652,7 @@
           <button class="ci-btn" id="btn-prev" ${idx===0?'disabled':''}>&larr; Previous</button>
           <div class="ci-navrow-links">
             <button class="ci-toplink" id="btn-cancel">Save &amp; exit</button>
+            <button class="ci-toplink" id="btn-save-progress">Save</button>
             <button class="ci-toplink" id="btn-finish">Review &amp; Finish</button>
           </div>
           <button class="ci-btn primary" id="btn-next">${idx===total-1 ? 'Review & Finish' : 'Next \u2192'}</button>
@@ -1606,6 +1704,19 @@
       saveFormToState(artist);
       state.view = 'summary';
       render();
+    };
+    document.getElementById('btn-save-progress').onclick = async () => {
+      const btn = document.getElementById('btn-save-progress');
+      saveFormToState(artist);
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      const ok = await persistCheckin();
+      btn.disabled = false;
+      btn.textContent = ok ? 'Saved \u2713' : 'Save failed — retry';
+      setTimeout(()=>{
+        const b = document.getElementById('btn-save-progress');
+        if(b) b.textContent = 'Save';
+      }, 2500);
     };
     document.getElementById('btn-cancel').onclick = async () => {
       saveFormToState(artist);
@@ -1714,11 +1825,28 @@
   }
 
   function isBlocked(e){
-    return e.hasBlocker === 'Yes' || e.status === 'On Hold' || e.pace === 'Behind';
+    return e.hasBlocker === 'Yes' || e.status === 'Hold' || e.pace === 'Behind';
+  }
+
+  function firstName(fullName){
+    return String(fullName||'').trim().split(/\s+/)[0] || fullName;
+  }
+
+  // Derives the show code(s) covered by this payload from its task names
+  // (e.g. "ELS", or "ALB/ ELS/ ELW" when multiple shows are represented).
+  function deriveShowCodesFromPayload(payload){
+    const codes = new Set();
+    (payload.artists||[]).forEach(a => (a.entries||[]).forEach(e=>{
+      const nm = taskNameFromStoredEntry(e);
+      if(nm && nm !== '(no task selected)') codes.add(nm.slice(0,3).toUpperCase());
+    }));
+    return Array.from(codes).sort().join('/ ');
   }
 
   function buildSummaryText(payload){
-    const lines = [`Daily Check-in — ${payload.label}`, ''];
+    const showCodes = deriveShowCodesFromPayload(payload) || 'ALL';
+    const isoDate = payload.date || '';
+    const lines = [`${showCodes} - Stand Up Report - ${isoDate}`, ''];
     const attention = [];
     payload.artists.forEach(a=>{
       const entries = (a.entries||[]).filter(e => {
@@ -1726,22 +1854,22 @@
         return (name && name !== '(no task selected)') || e.notes || e.status || e.blockerText;
       });
       if(!entries.length) return;
-      lines.push(`*${a.artist}*`);
+      lines.push(firstName(a.artist));
       entries.forEach(e=>{
         const name = taskNameFromStoredEntry(e);
-        const due = e.dueDisplay ? ` (due ${e.dueDisplay})` : '';
-        const status = e.status || 'No status';
-        const pace = e.pace ? ` — ${e.pace}` : '';
-        lines.push(`• ${name}${due}: ${status}${pace}`);
-        if(e.hasBlocker === 'Yes' && e.blockerText) lines.push(`   ⚠ Blocked: ${e.blockerText}`);
-        if(e.notes) lines.push(`   Notes: ${e.notes}`);
-        if(isBlocked(e)) attention.push(`${a.artist} — ${name}`);
+        lines.push(`    *${name}*`);
+        if(e.dueDisplay) lines.push(`        (due ${e.dueDisplay})`);
+        if(e.status) lines.push(`        Status: ${e.status}`);
+        if(e.pace) lines.push(`        Pace: ${e.pace}`);
+        if(e.hasBlocker === 'Yes' && e.blockerText) lines.push(`        ⚠ Blocked: ${e.blockerText}`);
+        if(e.notes) lines.push(`        Notes: ${e.notes}`);
+        lines.push('');
+        if(isBlocked(e)) attention.push(`${firstName(a.artist)} — ${name}`);
       });
-      lines.push('');
     });
     if(attention.length){
-      lines.push('*Needs attention:*');
-      attention.forEach(t=>lines.push(`• ${t}`));
+      lines.push('Needs attention:');
+      attention.forEach(t=>lines.push(`    ${t}`));
     }
     return lines.join('\n').trim();
   }
@@ -1932,6 +2060,7 @@
         .filter(rec => rec.entries && rec.entries.length);
       const reportPayload = {
         label: `Report — ${state.reportDate}`,
+        date: state.reportDate,
         artists: latestRecords.map(rec=>({artist: rec.artist, entries: rec.entries}))
       };
 
@@ -2026,12 +2155,12 @@
           ${b.notes ? `<div style="margin-top:3px;color:var(--text-dim)">${esc(b.notes)}</div>` : ''}
         </div>
       </div>
-    `).join('') : '<div class="ci-empty">No one has flagged a blocker or is On Hold / Behind right now.</div>';
+    `).join('') : '<div class="ci-empty">No one has flagged a blocker or is on Hold / Behind right now.</div>';
 
     app.innerHTML = `
       <div class="ci-hero">
         <h1 class="ci-display">Blockers</h1>
-        <p>${esc(payload.label || '')} &mdash; everyone currently On Hold or Behind pace, at a glance.</p>
+        <p>${esc(payload.label || '')} &mdash; everyone currently on Hold or Behind pace, at a glance.</p>
       </div>
       <div class="ci-card" style="border-top:1px solid var(--line);border-radius:10px;">
         ${rows}
